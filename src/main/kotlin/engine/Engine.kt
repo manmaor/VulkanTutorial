@@ -1,16 +1,7 @@
-package com.maorbarak
+package com.maorbarak.engine
 
-object EngineProperties {
-    private const val defaultUPS = 30
-    private const val filename = "eng.properties"
-
-    val ups: Int
-
-    init {
-        // Reading properties file
-        ups = defaultUPS
-    }
-}
+import com.maorbarak.engine.graph.Render
+import com.maorbarak.engine.scene.Scene
 
 class Engine(
     windowTitle: String,

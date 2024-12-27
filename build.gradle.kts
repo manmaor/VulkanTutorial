@@ -35,6 +35,9 @@ dependencies {
     runtimeOnly("org.lwjgl", "lwjgl-vma", classifier = lwjglNatives)
     implementation("org.joml", "joml", jomlVersion)
     implementation("org.joml", "joml-primitives", `joml-primitivesVersion`)
+
+    implementation("org.tinylog:tinylog-api-kotlin:2.7.0")
+    implementation("org.tinylog:tinylog-impl:2.7.0")
 }
 
 tasks.test {

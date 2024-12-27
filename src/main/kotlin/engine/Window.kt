@@ -1,4 +1,4 @@
-package com.maorbarak
+package com.maorbarak.engine
 
 import org.lwjgl.glfw.Callbacks.glfwFreeCallbacks
 import org.lwjgl.glfw.GLFW.*
