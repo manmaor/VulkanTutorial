@@ -16,7 +16,7 @@ class Window(
     var height: Int
         private set
 
-    val windowHandle: Long
+    val handle: Long
     val mouseInput: MouseInput
 
     init {
@@ -36,14 +36,14 @@ class Window(
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API) // What does this means
         glfwWindowHint(GLFW_MAXIMIZED, GLFW_FALSE)
 
-        windowHandle = glfwCreateWindow(width, height, title, MemoryUtil.NULL, MemoryUtil.NULL)
-        if (windowHandle == MemoryUtil.NULL) {
+        handle = glfwCreateWindow(width, height, title, MemoryUtil.NULL, MemoryUtil.NULL)
+        if (handle == MemoryUtil.NULL) {
             throw RuntimeException("Failed to create the GLFW window");
         }
 
-        glfwSetFramebufferSizeCallback(windowHandle) { window, w, h -> resize(w, h) }
+        glfwSetFramebufferSizeCallback(handle) { window, w, h -> resize(w, h) }
 
-        glfwSetKeyCallback(windowHandle) { window, key, scancode, action, mods ->
+        glfwSetKeyCallback(handle) { window, key, scancode, action, mods ->
             if (key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE) {
                 glfwSetWindowShouldClose(window, true)
             }
@@ -52,17 +52,17 @@ class Window(
 //            }
         }
 
-        mouseInput = MouseInput(windowHandle)
+        mouseInput = MouseInput(handle)
     }
 
     fun cleanup() {
-        glfwFreeCallbacks(windowHandle);
-        glfwDestroyWindow(windowHandle);
+        glfwFreeCallbacks(handle);
+        glfwDestroyWindow(handle);
         glfwTerminate();
     }
 
     fun isKeyPressed(keyCode: Int): Boolean {
-        return glfwGetKey(windowHandle, keyCode) == GLFW_PRESS;
+        return glfwGetKey(handle, keyCode) == GLFW_PRESS;
     }
 
     fun pollEvents() {
@@ -81,10 +81,10 @@ class Window(
     }
 
     fun setShouldClose() {
-        glfwSetWindowShouldClose(windowHandle, true);
+        glfwSetWindowShouldClose(handle, true);
     }
 
     fun shouldClose(): Boolean {
-        return glfwWindowShouldClose(windowHandle);
+        return glfwWindowShouldClose(handle);
     }
 }

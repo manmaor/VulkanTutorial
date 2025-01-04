@@ -7,6 +7,7 @@ object EngineProperties {
 
     val ups: Int
     val validate: Boolean
+    val physDeviceName: String?
 
     init {
         // Reading properties file
@@ -22,6 +23,7 @@ object EngineProperties {
                 } ?: mapOf()
             ups = props.getOrDefault("ups", DEFAULT_UPS).toString().toInt()
             validate = props.getOrDefault("validate", DEFAULT_VALIDATE).toString().toBoolean()
+            physDeviceName = props["physDeviceName"]
         }
     }
 }
