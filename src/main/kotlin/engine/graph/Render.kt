@@ -17,6 +17,8 @@ class Render(
 
     private val surface: Surface
 
+    private val swapChain: SwapChain
+
     init {
         instance = Instance(EngineProperties.validate)
 
@@ -26,9 +28,12 @@ class Render(
 
         surface = Surface(physicalDevice, window.handle)
 
+        swapChain = SwapChain(device, surface, window, EngineProperties.requestedImages, EngineProperties.vSync)
+
     }
 
     fun cleanup() {
+        swapChain.cleanup()
         surface.cleanup()
         device.cleanup()
         physicalDevice.cleanup()
