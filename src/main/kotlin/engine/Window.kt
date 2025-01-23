@@ -2,11 +2,13 @@ package com.maorbarak.engine
 
 import org.lwjgl.glfw.Callbacks.glfwFreeCallbacks
 import org.lwjgl.glfw.GLFW.*
+import org.lwjgl.glfw.GLFWKeyCallbackI
 import org.lwjgl.glfw.GLFWVulkan.*
 import org.lwjgl.system.MemoryUtil
 
 class Window(
-    val title: String
+    val title: String,
+    keyCallback: GLFWKeyCallbackI? = null
 ) {
 
     var resized = false
@@ -47,9 +49,9 @@ class Window(
             if (key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE) {
                 glfwSetWindowShouldClose(window, true)
             }
-//            keyCallback?.let {
-//                it.invoke(window, key, scancode, action, mods)
-//            }
+            keyCallback?.let {
+                it.invoke(window, key, scancode, action, mods)
+            }
         }
 
         mouseInput = MouseInput(handle)

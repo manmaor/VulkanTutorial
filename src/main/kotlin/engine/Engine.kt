@@ -7,13 +7,16 @@ class Engine(
     windowTitle: String,
     val appLogic: IAppLogic
 ) {
-    val window: Window = Window(windowTitle)
-    val scene: Scene = Scene(window)
-    val render: Render = Render(window, scene)
+    val window: Window
+    val scene: Scene
+    val render: Render
 
     var running: Boolean = false
 
     init {
+        window = Window(windowTitle)
+        scene = Scene(window)
+        render = Render(window, scene)
         appLogic.init(window, scene, render)
     }
 

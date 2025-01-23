@@ -14,25 +14,38 @@ class Render(
     private val physicalDevice: PhysicalDevice
     private val device: Device
     private val graphicsQueue: Queue.GraphicsQueue
-
+    private val presentQueue: Queue.PresentQueue
     private val surface: Surface
-
     private val swapChain: SwapChain
+    private val commandPool: CommandPool
+    private val fwdRenderActivity: ForwardRenderActivity
+
 
     init {
         instance = Instance(EngineProperties.validate)
 
         physicalDevice = PhysicalDevice.createPhysicalDevice(instance, EngineProperties.physDeviceName)
         device = Device(physicalDevice)
-        graphicsQueue = Queue.GraphicsQueue(device, 0)
 
         surface = Surface(physicalDevice, window.handle)
 
-        swapChain = SwapChain(device, surface, window, EngineProperties.requestedImages, EngineProperties.vSync)
+        graphicsQueue = Queue.GraphicsQueue(device, 0)
+        presentQueue = Queue.PresentQueue(device, surface, 0)
 
+        swapChain = SwapChain(device, surface, window, EngineProperties.requestedImages, EngineProperties.vSync,
+            presentQueue, listOf<Queue>(graphicsQueue))
+
+        commandPool = CommandPool(device, graphicsQueue.queueFamilyIndex)
+        fwdRenderActivity = ForwardRenderActivity(swapChain, commandPool)
     }
 
     fun cleanup() {
+        presentQueue.waitIdle()
+        graphicsQueue.waitIdle()
+        device.waitIdle()
+
+        fwdRenderActivity.cleanup()
+        commandPool.cleanup()
         swapChain.cleanup()
         surface.cleanup()
         device.cleanup()
@@ -41,6 +54,15 @@ class Render(
     }
 
     fun render(scene: Scene) {
-        // To be implemented
+        fwdRenderActivity.waitForFence()
+
+        val imageIndex = swapChain.acquireNextImage()
+        if (imageIndex < 0) {
+            return
+        }
+
+        fwdRenderActivity.submit(graphicsQueue)
+
+        swapChain.presentImage(presentQueue, imageIndex)
     }
 }

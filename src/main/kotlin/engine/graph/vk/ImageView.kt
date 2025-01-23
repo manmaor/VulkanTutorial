@@ -12,9 +12,9 @@ class ImageView(
     imageViewData: ImageViewData
 ) {
 
-    private val aspectMask: Int
-    private val mipLevels: Int
-    private val vkImageView: Long
+    val aspectMask: Int
+    val mipLevels: Int
+    val vkImageView: Long
 
     init {
         aspectMask = imageViewData.aspectMask

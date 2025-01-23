@@ -2,13 +2,10 @@ package com.maorbarak.engine.graph.vk
 
 import com.maorbarak.engine.graph.vk.VulkanUtils.vkCheck
 import org.lwjgl.system.MemoryStack
+import org.lwjgl.vulkan.*
 import org.lwjgl.vulkan.KHRPortabilitySubset.VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
 import org.lwjgl.vulkan.KHRSwapchain.VK_KHR_SWAPCHAIN_EXTENSION_NAME
 import org.lwjgl.vulkan.VK10.*
-import org.lwjgl.vulkan.VkDevice
-import org.lwjgl.vulkan.VkDeviceCreateInfo
-import org.lwjgl.vulkan.VkDeviceQueueCreateInfo
-import org.lwjgl.vulkan.VkPhysicalDeviceFeatures
 import org.tinylog.kotlin.Logger
 
 class Device(
@@ -73,6 +70,24 @@ class Device(
             .also {
                 Logger.debug("Supported device extensions $it");
             }
+
+//    private fun getDeviceExtensions(): Set<String> {
+//        MemoryStack.stackPush().use { stack ->
+//            val numExtensionsBuf = stack.callocInt(1)
+//            vkEnumerateDeviceExtensionProperties(physicalDevice.vkPhysicalDevice, null as String?, numExtensionsBuf, null)
+//            val numExtensions = numExtensionsBuf[0]
+//            Logger.debug("Device supports [{}] extensions", numExtensions)
+//
+//            val propsBuff = VkExtensionProperties.calloc(numExtensions, stack)
+//            vkEnumerateDeviceExtensionProperties(physicalDevice.vkPhysicalDevice, null as String?, numExtensionsBuf, propsBuff)
+//            return propsBuff
+//                .map { it.extensionNameString() }
+//                .toSet()
+//                .also {
+//                    Logger.debug("!!Supported device extensions $it")
+//                }
+//        }
+//    }
 
     /**
      * Waits for all operations for complete
