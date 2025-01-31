@@ -13,6 +13,7 @@ object EngineProperties {
     val physDeviceName: String?
     val requestedImages: Int
     val vSync: Boolean
+    val isShaderRecompilation: Boolean
 
     init {
         // Reading properties file
@@ -24,6 +25,7 @@ object EngineProperties {
             physDeviceName = props["physDeviceName"]
             requestedImages = props.getOrDefault("requestedImages", DEFAULT_REQUESTED_IMAGES).toString().toInt()
             vSync = props.getOrDefault("vsync", true).toString().toBoolean()
+            isShaderRecompilation = props.getOrDefault("shaderRecompilation", false).toString().toBoolean()
         }
     }
 

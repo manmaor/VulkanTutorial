@@ -39,8 +39,8 @@ open class Queue(
 
     fun submit(commandBuffers: PointerBuffer,
                waitSemaphores: LongBuffer?,
-               dstStageMasks: IntBuffer,
-               signalSemaphores: LongBuffer,
+               dstStageMasks: IntBuffer?,
+               signalSemaphores: LongBuffer?,
                fence: Fence?) {
         MemoryStack.stackPush().use { stack ->
             val submitInfo = VkSubmitInfo.calloc(stack)

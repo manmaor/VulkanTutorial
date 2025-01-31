@@ -10,7 +10,7 @@ repositories {
 //    maven("https://raw.githubusercontent.com/kotlin-graphics/mary/master")
 }
 
-val lwjglVersion = "3.3.5"
+val lwjglVersion = "3.3.6"
 val jomlVersion = "1.10.7"
 val `joml-primitivesVersion` = "1.10.0"
 val lwjglNatives = "natives-windows"
@@ -27,12 +27,15 @@ dependencies {
     implementation("org.lwjgl", "lwjgl-stb")
     implementation("org.lwjgl", "lwjgl-vma")
     implementation("org.lwjgl", "lwjgl-vulkan")
+    implementation("org.lwjgl", "lwjgl-shaderc")
     runtimeOnly("org.lwjgl", "lwjgl", classifier = lwjglNatives)
     runtimeOnly("org.lwjgl", "lwjgl-assimp", classifier = lwjglNatives)
     runtimeOnly("org.lwjgl", "lwjgl-glfw", classifier = lwjglNatives)
     runtimeOnly("org.lwjgl", "lwjgl-openal", classifier = lwjglNatives)
     runtimeOnly("org.lwjgl", "lwjgl-stb", classifier = lwjglNatives)
     runtimeOnly("org.lwjgl", "lwjgl-vma", classifier = lwjglNatives)
+    runtimeOnly("org.lwjgl", "lwjgl-shaderc", classifier = lwjglNatives)
+
     implementation("org.joml", "joml", jomlVersion)
     implementation("org.joml", "joml-primitives", `joml-primitivesVersion`)
 

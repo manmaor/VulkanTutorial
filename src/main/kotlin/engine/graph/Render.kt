@@ -4,6 +4,8 @@ import com.maorbarak.engine.EngineProperties
 import com.maorbarak.engine.scene.Scene
 import com.maorbarak.engine.Window
 import com.maorbarak.engine.graph.vk.*
+import com.maorbarak.engine.scene.ModelData
+import org.tinylog.kotlin.Logger
 
 class Render(
     val window: Window,
@@ -19,6 +21,8 @@ class Render(
     private val swapChain: SwapChain
     private val commandPool: CommandPool
     private val fwdRenderActivity: ForwardRenderActivity
+    private val pipelineCache: PipelineCache
+    private val vulkanModels: MutableList<VulkanModel>
 
 
     init {
@@ -36,7 +40,9 @@ class Render(
             presentQueue, listOf<Queue>(graphicsQueue))
 
         commandPool = CommandPool(device, graphicsQueue.queueFamilyIndex)
-        fwdRenderActivity = ForwardRenderActivity(swapChain, commandPool)
+        pipelineCache = PipelineCache(device)
+        fwdRenderActivity = ForwardRenderActivity(swapChain, commandPool, pipelineCache)
+        vulkanModels = mutableListOf()
     }
 
     fun cleanup() {
@@ -44,6 +50,7 @@ class Render(
         graphicsQueue.waitIdle()
         device.waitIdle()
 
+        vulkanModels.forEach(VulkanModel::cleanup)
         fwdRenderActivity.cleanup()
         commandPool.cleanup()
         swapChain.cleanup()
@@ -51,6 +58,12 @@ class Render(
         device.cleanup()
         physicalDevice.cleanup()
         instance.cleanup()
+    }
+
+    fun loadModels(modelDataList: List<ModelData>) {
+        Logger.debug("Loading ${modelDataList.size} model(s)")
+        vulkanModels.addAll(VulkanModel.transformModels(modelDataList, commandPool, graphicsQueue))
+        Logger.debug("Loaded ${modelDataList.size} model(s)")
     }
 
     fun render(scene: Scene) {
@@ -61,6 +74,7 @@ class Render(
             return
         }
 
+        fwdRenderActivity.recordCommandBuffer(vulkanModels)
         fwdRenderActivity.submit(graphicsQueue)
 
         swapChain.presentImage(presentQueue, imageIndex)
