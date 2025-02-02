@@ -3,37 +3,44 @@ package com.maorbarak.engine.graph
 import com.maorbarak.engine.EngineProperties
 import com.maorbarak.engine.graph.vk.*
 import com.maorbarak.engine.graph.vk.Queue
+import com.maorbarak.engine.scene.Scene
+import org.joml.Matrix4f
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.util.shaderc.Shaderc
 import org.lwjgl.vulkan.*
 import org.lwjgl.vulkan.VK11.*
+import java.nio.ByteBuffer
 
 class ForwardRenderActivity(
-    val swapChain: SwapChain,
+    private var swapChain: SwapChain,
     commandPool: CommandPool,
-    pipelineCache: PipelineCache
+    pipelineCache: PipelineCache,
+    val scene: Scene
 ) {
 
     val commandBuffers: List<CommandBuffer>
+    val device: Device
     val fences: List<Fence>
-    val frameBuffers: List<FrameBuffer>
+
     val fwdShaderProgram: ShaderProgram
     val pipeline: Pipeline
     val renderPass: SwapChainRenderPass
 
+    // some tutorials are using incorrectly only one depth buffer, this is wrong because image creation can overlap
+    // origin: chapter 7, Putting it all up together
+    private lateinit var depthAttachments: Array<Attachment>
+    private lateinit var frameBuffers: List<FrameBuffer>
+
     init {
+        device = swapChain.device
+
         MemoryStack.stackPush().use { stack ->
             val device = swapChain.device
-            val swapChainExtent = swapChain.swapChainExtent
             val imageViews = swapChain.imageViews
 
-            renderPass = SwapChainRenderPass(swapChain)
-
-            val pAttachments = stack.mallocLong(1)
-            frameBuffers = imageViews.map {
-                pAttachments.put(0, it.vkImageView)
-                FrameBuffer(device, swapChainExtent.width(), swapChainExtent.height(), pAttachments, renderPass.vkRenderPass)
-            }
+            createDepthImages()
+            renderPass = SwapChainRenderPass(swapChain, depthAttachments[0].image.format)
+            createFrameBuffers()
 
             if (EngineProperties.isShaderRecompilation) {
                 ShaderCompiler.compileShaderIfChanged(VERTEX_SHADER_FILE_GLSL, Shaderc.shaderc_glsl_vertex_shader)
@@ -44,7 +51,7 @@ class ForwardRenderActivity(
                 ShaderProgram.ShaderModuleData(VK_SHADER_STAGE_FRAGMENT_BIT, FRAGMENT_SHADER_FILE_SPV),
             ))
             val pipelineCreationInfo = Pipeline.PipelineCreationInfo(
-                renderPass.vkRenderPass, fwdShaderProgram, 1, VertexBufferStructure())
+                renderPass.vkRenderPass, fwdShaderProgram, 1, true, GraphConstants.MAT4X4_SIZE*2,  VertexBufferStructure())
             pipeline = Pipeline(pipelineCache, pipelineCreationInfo)
             pipelineCreationInfo.cleanup()
 
@@ -59,11 +66,33 @@ class ForwardRenderActivity(
 
     fun cleanup() {
         pipeline.cleanup()
+        depthAttachments.forEach(Attachment::cleanup)
         fwdShaderProgram.cleanup()
         frameBuffers.forEach(FrameBuffer::cleanup)
         renderPass.cleanup()
         commandBuffers.forEach(CommandBuffer::cleanup)
         fences.forEach(Fence::cleanup)
+    }
+
+    private fun createDepthImages() {
+        val (width, height) = swapChain.swapChainExtent.run { width() to height() }
+        depthAttachments = (0..<swapChain.numImages)
+            .map { Attachment(device, width, height, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) }
+            .toTypedArray()
+    }
+
+    private fun createFrameBuffers() {
+        MemoryStack.stackPush().use { stack ->
+            val (width, height) = swapChain.swapChainExtent.run { width() to height() }
+            val imageViews = swapChain.imageViews
+
+            val pAttachments = stack.mallocLong(2)
+            frameBuffers = imageViews.indices.map { i ->
+                pAttachments.put(0, imageViews[i].vkImageView)
+                pAttachments.put(1, depthAttachments[i].imageView.vkImageView)
+                FrameBuffer(device, width, height, pAttachments, renderPass.vkRenderPass)
+            }
+        }
     }
 
     fun recordCommandBuffer(vulkanModelList: List<VulkanModel>) {
@@ -75,8 +104,9 @@ class ForwardRenderActivity(
             val frameBuffer = frameBuffers[idx]
 
             commandBuffer.reset()
-            val clearValues = VkClearValue.calloc(1, stack)
+            val clearValues = VkClearValue.calloc(2, stack)
             clearValues.apply(0) { v -> v.color().float32(0, 0.5f).float32(1, 0.7f).float32(2, 0.9f).float32(3, 1f) }
+            clearValues.apply(1) { v -> v.depthStencil().depth(1.0f)}
 
 
             val renderPassBeginInfo = VkRenderPassBeginInfo.calloc(stack)
@@ -109,18 +139,34 @@ class ForwardRenderActivity(
             val offsets = stack.mallocLong(1)
             offsets.put(0, 0.toLong())
             val vertexBuffer = stack.mallocLong(1)
+            val pushConstantBuffer = stack.malloc(GraphConstants.MAT4X4_SIZE * 2)
             vulkanModelList.forEach { vulkanModel ->
+                val modelId = vulkanModel.modelId
+                val entities = scene.entitiesMap[modelId]
+                if (entities?.isNotEmpty() != true) {
+                    return@forEach
+                }
                 vulkanModel.vulkanMeshList.forEach { mesh ->
                     vertexBuffer.put(0, mesh.verticesBuffer.buffer)
                     vkCmdBindVertexBuffers(cmdHandle, 0, vertexBuffer, offsets)
                     vkCmdBindIndexBuffer(cmdHandle, mesh.indicesBuffer.buffer, 0, VK_INDEX_TYPE_UINT32)
-                    vkCmdDrawIndexed(cmdHandle, mesh.numIndices, 1, 0, 0, 0)
+
+                    entities.forEach { entity ->
+                        setPushConstantBuffer(cmdHandle, scene.projection.projectionMatrix, entity.modelMatrix, pushConstantBuffer)
+                        vkCmdDrawIndexed(cmdHandle, mesh.numIndices, 1, 0, 0, 0)
+                    }
                 }
             }
 
             vkCmdEndRenderPass(cmdHandle)
             commandBuffer.endRecording()
         }
+    }
+
+    private fun setPushConstantBuffer(cmdHandle: VkCommandBuffer, projMatrix: Matrix4f, modelMatrix: Matrix4f, pushConstantBuffer: ByteBuffer) {
+        projMatrix.get(pushConstantBuffer)
+        modelMatrix.get(GraphConstants.MAT4X4_SIZE, pushConstantBuffer)
+        vkCmdPushConstants(cmdHandle, pipeline.vkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, pushConstantBuffer)
     }
 
     fun submit(queue: Queue) {
@@ -138,6 +184,14 @@ class ForwardRenderActivity(
                 currentFence
             )
         }
+    }
+
+    fun resize(swapChain: SwapChain) {
+        this.swapChain = swapChain
+        frameBuffers.forEach(FrameBuffer::cleanup)
+        depthAttachments.forEach(Attachment::cleanup)
+        createDepthImages()
+        createFrameBuffers()
     }
 
     fun waitForFence() {

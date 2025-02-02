@@ -18,7 +18,7 @@ class Render(
     private val graphicsQueue: Queue.GraphicsQueue
     private val presentQueue: Queue.PresentQueue
     private val surface: Surface
-    private val swapChain: SwapChain
+    private var swapChain: SwapChain
     private val commandPool: CommandPool
     private val fwdRenderActivity: ForwardRenderActivity
     private val pipelineCache: PipelineCache
@@ -41,7 +41,7 @@ class Render(
 
         commandPool = CommandPool(device, graphicsQueue.queueFamilyIndex)
         pipelineCache = PipelineCache(device)
-        fwdRenderActivity = ForwardRenderActivity(swapChain, commandPool, pipelineCache)
+        fwdRenderActivity = ForwardRenderActivity(swapChain, commandPool, pipelineCache, scene)
         vulkanModels = mutableListOf()
     }
 
@@ -67,16 +67,35 @@ class Render(
     }
 
     fun render(scene: Scene) {
+        if (window.width <= 0 && window.height <= 0) {
+            // minimized
+            return
+        }
         fwdRenderActivity.waitForFence()
 
-        val imageIndex = swapChain.acquireNextImage()
-        if (imageIndex < 0) {
-            return
+        val imageIndex = swapChain.acquireNextImage().takeUnless { window.resized || it < 0 } ?: run {
+            window.resetResized()
+            resize()
+            scene.projection.resize(window.width, window.height)
+            swapChain.acquireNextImage()
         }
 
         fwdRenderActivity.recordCommandBuffer(vulkanModels)
         fwdRenderActivity.submit(graphicsQueue)
 
-        swapChain.presentImage(presentQueue, imageIndex)
+        if (swapChain.presentImage(presentQueue, imageIndex)) {
+            window.resized = true
+        }
+    }
+
+    private fun resize() {
+        device.waitIdle()
+        graphicsQueue.waitIdle()
+
+        swapChain.cleanup()
+
+        swapChain = SwapChain(device, surface, window, EngineProperties.requestedImages, EngineProperties.vSync,
+            presentQueue, listOf<Queue>(graphicsQueue))
+        fwdRenderActivity.resize(swapChain)
     }
 }

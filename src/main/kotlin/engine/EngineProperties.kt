@@ -7,6 +7,9 @@ object EngineProperties {
     private const val DEFAULT_VALIDATE = false
     private const val FILENAME = "eng.properties"
     private const val DEFAULT_REQUESTED_IMAGES = 3
+    private const val DEFAULT_FOV = 60.0f
+    private const val DEFAULT_Z_NEAR = 1.0f
+    private const val DEFAULT_Z_FAR = 100f
 
     val ups: Int
     val validate: Boolean
@@ -14,6 +17,9 @@ object EngineProperties {
     val requestedImages: Int
     val vSync: Boolean
     val isShaderRecompilation: Boolean
+    val fov: Float
+    val zNear: Float
+    val zFar: Float
 
     init {
         // Reading properties file
@@ -26,6 +32,9 @@ object EngineProperties {
             requestedImages = props.getOrDefault("requestedImages", DEFAULT_REQUESTED_IMAGES).toString().toInt()
             vSync = props.getOrDefault("vsync", true).toString().toBoolean()
             isShaderRecompilation = props.getOrDefault("shaderRecompilation", false).toString().toBoolean()
+            fov = Math.toRadians(props.getOrDefault("fov", DEFAULT_FOV).toString().toDouble()).toFloat()
+            zNear = props.getOrDefault("zNear", DEFAULT_Z_NEAR).toString().toFloat()
+            zFar = props.getOrDefault("zFar", DEFAULT_Z_FAR).toString().toFloat()
         }
     }
 

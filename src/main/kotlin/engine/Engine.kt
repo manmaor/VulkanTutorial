@@ -45,7 +45,7 @@ class Engine(
             window.pollEvents()
 
             val now = System.currentTimeMillis()
-            deltaUpdate += (now + initialTime) / timeU
+            deltaUpdate += (now - initialTime) / timeU
 
             appLogic.input(window, scene, now - initialTime)
 

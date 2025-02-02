@@ -12,7 +12,6 @@ class Window(
 ) {
 
     var resized = false
-        private set
     var width: Int
         private set
     var height: Int

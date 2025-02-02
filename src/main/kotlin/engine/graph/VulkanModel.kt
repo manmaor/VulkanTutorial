@@ -37,7 +37,10 @@ class VulkanModel(
         }
 
         private fun createVerticesBuffers(device: Device, meshData: ModelData.MeshData): TransferBuffers {
-            val bufferSize = meshData.position.size * GraphConstants.FLOAT_LENGTH
+            val positions = meshData.position
+            val textCoords = if (meshData.textCoords == null || meshData.textCoords.isEmpty()) FloatArray(positions.size/3*2) else meshData.textCoords
+            val numElements = positions.size + textCoords.size
+            val bufferSize = numElements * GraphConstants.FLOAT_LENGTH
 
             val srcBuffer = VulkanBuffer(device, bufferSize.toLong(),
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT or VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
@@ -46,7 +49,17 @@ class VulkanModel(
 
             val mappedMemory = srcBuffer.map()
             val data = MemoryUtil.memFloatBuffer(mappedMemory, srcBuffer.requestedSize.toInt())
-            data.put(meshData.position)
+
+            (0..<(positions.size / 3)).forEach { row ->
+                val startPos = row * 3
+                val startTextCoords = row * 2
+                data.put(positions[startPos])
+                data.put(positions[startPos + 1])
+                data.put(positions[startPos + 2])
+                data.put(textCoords[startTextCoords])
+                data.put(textCoords[startTextCoords + 1])
+            }
+
             srcBuffer.unMap()
 
             return TransferBuffers(srcBuffer, dstBuffer)
