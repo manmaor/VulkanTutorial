@@ -2,6 +2,7 @@ package com.maorbarak.engine.graph
 
 import com.maorbarak.engine.graph.vk.*
 import com.maorbarak.engine.scene.ModelData
+import org.joml.Vector4f
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil
 import org.lwjgl.vulkan.VK11.*
@@ -12,10 +13,10 @@ class VulkanModel(
     val modelId: String
 ) {
 
-    val vulkanMeshList: MutableList<VulkanMesh> = mutableListOf()
+    val vulkanMaterialList: MutableList<VulkanMaterial> = mutableListOf()
 
     fun cleanup() {
-        vulkanMeshList.forEach(VulkanMesh::cleanup)
+        vulkanMaterialList.forEach(VulkanMaterial::cleanup)
     }
 
     companion object {
@@ -76,17 +77,42 @@ class VulkanModel(
             }
         }
 
-        fun transformModels(modelDataList: List<ModelData>, commandPool: CommandPool, queue: Queue): List<VulkanModel> {
+        private fun transformMaterial(material: ModelData.Material,
+                                      device: Device,
+                                      textureCache: TextureCache,
+                                      cmd: CommandBuffer,
+                                      textureList: MutableList<Texture>): VulkanMaterial {
+            val texture = textureCache.createTexture(device, material.texturePath, VK_FORMAT_R8G8B8A8_SRGB)
+            val hasTexture = material.texturePath != null && material.texturePath.trim().isNotEmpty()
+
+            texture.recordTextureTransition(cmd)
+            textureList.add(texture)
+
+            return VulkanMaterial(material.diffuseColor, texture, hasTexture, mutableListOf())
+        }
+
+        fun transformModels(modelDataList: List<ModelData>, textureCache: TextureCache, commandPool: CommandPool, queue: Queue): List<VulkanModel> {
             val vulkanModelList: MutableList<VulkanModel> = mutableListOf()
             val device = commandPool.device
             val cmd = CommandBuffer(commandPool, oneTimeSubmit = true, primary = true)
             val stagingBufferList: MutableList<VulkanBuffer> = mutableListOf()
+            val textureList: MutableList<Texture> = mutableListOf()
 
             cmd.beginRecording()
 
             modelDataList.forEach { modelData ->
                 val vulkanModel = VulkanModel(modelData.modelId)
                 vulkanModelList.add(vulkanModel)
+
+                val defaultVulkanMaterial: VulkanMaterial by lazy {
+                    transformMaterial(ModelData.Material(), device, textureCache, cmd, textureList)
+                }
+
+                // Create textures defined for the materials
+                modelData.materialList.forEach { material ->
+                    val vulkanMaterial = transformMaterial(material, device, textureCache, cmd, textureList)
+                    vulkanModel.vulkanMaterialList.add(vulkanMaterial)
+                }
 
                 // Transform meshes loading their data into GPU buffers
                 modelData.meshDataList.forEach { meshData ->
@@ -99,7 +125,12 @@ class VulkanModel(
 
                     val vulkanMesh = VulkanMesh(verticesBuffer.dstBuffer, indicesBuffer.dstBuffer, meshData.indices.size)
 
-                    vulkanModel.vulkanMeshList.add(vulkanMesh)
+                    val vulkanMaterial: VulkanMaterial = if (meshData.materialIdx >= 0 && meshData.materialIdx < vulkanModel.vulkanMaterialList.size) {
+                        vulkanModel.vulkanMaterialList[meshData.materialIdx]
+                    } else {
+                        defaultVulkanMaterial
+                    }
+                    vulkanMaterial.vulkanMeshList.add(vulkanMesh)
                 }
             }
 
@@ -114,6 +145,7 @@ class VulkanModel(
             cmd.cleanup()
 
             stagingBufferList.forEach(VulkanBuffer::cleanup)
+            textureList.forEach(Texture::cleanupStgBuffer)
 
             return vulkanModelList.toList()
         }
@@ -130,6 +162,17 @@ class VulkanModel(
         fun cleanup() {
             verticesBuffer.cleanup()
             indicesBuffer.cleanup()
+        }
+    }
+
+    data class VulkanMaterial(
+        val diffuseColor: Vector4f,
+        val texture: Texture,
+        val hasTexture: Boolean,
+        val vulkanMeshList: MutableList<VulkanMesh>
+    ) {
+        fun cleanup() {
+            vulkanMeshList.forEach(VulkanMesh::cleanup)
         }
     }
 }

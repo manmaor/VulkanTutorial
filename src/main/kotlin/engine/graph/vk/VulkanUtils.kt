@@ -1,7 +1,13 @@
 package com.maorbarak.engine.graph.vk
 
+import org.joml.Matrix4f
+import org.lwjgl.system.MemoryStack
+import org.lwjgl.system.MemoryUtil
 import org.lwjgl.vulkan.VK10.VK_MAX_MEMORY_TYPES
 import org.lwjgl.vulkan.VK10.VK_SUCCESS
+import org.lwjgl.vulkan.VK11.VK_SHADER_STAGE_VERTEX_BIT
+import org.lwjgl.vulkan.VK11.vkCmdPushConstants
+import org.lwjgl.vulkan.VkCommandBuffer
 import java.util.*
 
 object VulkanUtils {
@@ -37,6 +43,21 @@ object VulkanUtils {
         }
 
         throw RuntimeException("Failed to find memoryType")
+    }
+
+    fun copyMatrixToBuffer(vulkanBuffer: VulkanBuffer, matrix: Matrix4f, offset: Int = 0) {
+        val mappedMemory = vulkanBuffer.map()
+        val matrixBuffer = MemoryUtil.memByteBuffer(mappedMemory, vulkanBuffer.requestedSize.toInt())
+        matrix.get(offset, matrixBuffer)
+        vulkanBuffer.unMap()
+    }
+
+    fun setMatrixAsPushConstant(pipeline: Pipeline, cmdHandle: VkCommandBuffer, matrix: Matrix4f) {
+        MemoryStack.stackPush().use { stack ->
+            val pushConstantBuffer = stack.malloc(GraphConstants.MAT4X4_SIZE)
+            matrix.get(0, pushConstantBuffer)
+            vkCmdPushConstants(cmdHandle, pipeline.vkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, pushConstantBuffer)
+        }
     }
 
     enum class OSType {

@@ -22,6 +22,7 @@ class Render(
     private val commandPool: CommandPool
     private val fwdRenderActivity: ForwardRenderActivity
     private val pipelineCache: PipelineCache
+    private val textureCache: TextureCache
     private val vulkanModels: MutableList<VulkanModel>
 
 
@@ -43,6 +44,7 @@ class Render(
         pipelineCache = PipelineCache(device)
         fwdRenderActivity = ForwardRenderActivity(swapChain, commandPool, pipelineCache, scene)
         vulkanModels = mutableListOf()
+        textureCache = TextureCache()
     }
 
     fun cleanup() {
@@ -50,6 +52,7 @@ class Render(
         graphicsQueue.waitIdle()
         device.waitIdle()
 
+        textureCache.cleanup()
         vulkanModels.forEach(VulkanModel::cleanup)
         fwdRenderActivity.cleanup()
         commandPool.cleanup()
@@ -62,8 +65,10 @@ class Render(
 
     fun loadModels(modelDataList: List<ModelData>) {
         Logger.debug("Loading ${modelDataList.size} model(s)")
-        vulkanModels.addAll(VulkanModel.transformModels(modelDataList, commandPool, graphicsQueue))
+        vulkanModels.addAll(VulkanModel.transformModels(modelDataList, textureCache, commandPool, graphicsQueue))
         Logger.debug("Loaded ${modelDataList.size} model(s)")
+
+        fwdRenderActivity.registerModels(vulkanModels)
     }
 
     fun render(scene: Scene) {

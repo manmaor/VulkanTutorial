@@ -10,6 +10,7 @@ object EngineProperties {
     private const val DEFAULT_FOV = 60.0f
     private const val DEFAULT_Z_NEAR = 1.0f
     private const val DEFAULT_Z_FAR = 100f
+    private const val DEFAULT_DEFAULT_TEXTURE_PATH = "resources/models/default/default.png"
 
     val ups: Int
     val validate: Boolean
@@ -20,6 +21,7 @@ object EngineProperties {
     val fov: Float
     val zNear: Float
     val zFar: Float
+    val defaultTexturePath: String
 
     init {
         // Reading properties file
@@ -35,6 +37,7 @@ object EngineProperties {
             fov = Math.toRadians(props.getOrDefault("fov", DEFAULT_FOV).toString().toDouble()).toFloat()
             zNear = props.getOrDefault("zNear", DEFAULT_Z_NEAR).toString().toFloat()
             zFar = props.getOrDefault("zFar", DEFAULT_Z_FAR).toString().toFloat()
+            defaultTexturePath = props.getOrDefault("defaultTexturePath", DEFAULT_DEFAULT_TEXTURE_PATH)
         }
     }
 

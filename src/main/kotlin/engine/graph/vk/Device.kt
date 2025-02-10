@@ -12,6 +12,7 @@ class Device(
     val physicalDevice: PhysicalDevice
 ) {
     val vkDevice: VkDevice
+    val isSamplerAnisotropy: Boolean
 
     init {
         Logger.debug("Creating device")
@@ -31,6 +32,12 @@ class Device(
 
             // Set up required features
             val features = VkPhysicalDeviceFeatures.calloc(stack)
+            val supportedFeatures = physicalDevice.vkPhysicalDeviceFeatures
+            isSamplerAnisotropy = supportedFeatures.samplerAnisotropy()
+            if (isSamplerAnisotropy) {
+                Logger.debug("Device supports anisotropy sampler")
+                features.samplerAnisotropy(true)
+            } else { Logger.debug("Device not supporting anisotropy sampler") }
 
             // Enable all the queue families
             val queuePropsBuff = physicalDevice.vkQueueFamilyProps
