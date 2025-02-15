@@ -14,7 +14,7 @@ class PhysicalDevice(
     val vkDeviceExtensions: VkExtensionProperties.Buffer // containing a list of supported extensions (name and version)
     val vkMemoryProperties: VkPhysicalDeviceMemoryProperties // contains information related to the different memory heaps the this device supports
     val vkPhysicalDeviceFeatures: VkPhysicalDeviceFeatures // contains fine-grained features supported by this device, such as if it supports depth clamping, certain types of shaders, etc
-    private val vkPhysicalDeviceProperties: VkPhysicalDeviceProperties //  contains the physical device properties, such as the device name, the vendor, its limits, etc
+    val vkPhysicalDeviceProperties: VkPhysicalDeviceProperties //  contains the physical device properties, such as the device name, the vendor, its limits, etc
     val vkQueueFamilyProps: VkQueueFamilyProperties.Buffer // holds the queue families supported by the device
 
     init {

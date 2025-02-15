@@ -69,6 +69,17 @@ class Pipeline(
             (0..<pipelineCreateInfo.numColorAttachments).forEach { i ->
                 blendAttState[i]
                     .colorWriteMask(VK_COLOR_COMPONENT_R_BIT or VK_COLOR_COMPONENT_G_BIT or VK_COLOR_COMPONENT_B_BIT or VK_COLOR_COMPONENT_A_BIT)
+                    .blendEnable(pipelineCreateInfo.useBlend)
+
+                if (pipelineCreateInfo.useBlend) {
+                    blendAttState[i]
+                        .colorBlendOp(VK_BLEND_OP_ADD) // ADD = [R = Rs0 × Sr + Rd × Dr, G = Gs0 × Sg + Gd × Dg and B = Bs0 × Sb + Bd × Db.]
+                        .alphaBlendOp(VK_BLEND_OP_ADD) // ADD = As0 × Sa + Ad × Da (Sa for source and Da for destination)
+                        .srcColorBlendFactor(VK_BLEND_FACTOR_SRC_ALPHA) // the factor for the rgb component (Sr, Sg, Sb)
+                        .dstColorBlendFactor(VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA) // controls the blend factor to be used for the RGB destination factors (Dr, Dg and Db).
+                        .srcAlphaBlendFactor(VK_BLEND_FACTOR_ONE) //  controls the blend factor to be used for the alpha source component (Sa). In our case it will be 1
+                        .dstAlphaBlendFactor(VK_BLEND_FACTOR_ZERO)  // it will have a zero, ignoring the alpha value of the destination color.
+                }
             }
             val colorBlendState = VkPipelineColorBlendStateCreateInfo.calloc(stack)
                 .sType(VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO)
@@ -141,6 +152,7 @@ class Pipeline(
         val shaderProgram: ShaderProgram,
         val numColorAttachments: Int,
         val hasDepthAttachment: Boolean,
+        val useBlend: Boolean,
         val pushConstantsSize: Int,
         val vertexInputStateInfo: VertexInputStateInfo,
         val descriptorSetLayouts: Array<DescriptorSetLayout>?

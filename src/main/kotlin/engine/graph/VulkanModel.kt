@@ -171,8 +171,11 @@ class VulkanModel(
         val hasTexture: Boolean,
         val vulkanMeshList: MutableList<VulkanMesh>
     ) {
+        val isTransparent = texture.hasTransparencies
+
         fun cleanup() {
             vulkanMeshList.forEach(VulkanMesh::cleanup)
         }
+
     }
 }

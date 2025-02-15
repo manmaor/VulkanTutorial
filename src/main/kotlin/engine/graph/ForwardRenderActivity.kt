@@ -5,9 +5,11 @@ import com.maorbarak.engine.graph.vk.*
 import com.maorbarak.engine.graph.vk.Queue
 import com.maorbarak.engine.scene.Scene
 import org.lwjgl.system.MemoryStack
+import org.lwjgl.system.MemoryUtil
 import org.lwjgl.util.shaderc.Shaderc
 import org.lwjgl.vulkan.*
 import org.lwjgl.vulkan.VK11.*
+import java.nio.LongBuffer
 
 class ForwardRenderActivity(
     private var swapChain: SwapChain,
@@ -31,12 +33,22 @@ class ForwardRenderActivity(
 
     private lateinit var descriptorPool: DescriptorPool
     private lateinit var descriptorSetLayouts: Array<DescriptorSetLayout>
-    private lateinit var uniformDescriptorSetLayout: DescriptorSetLayout.UniformDescriptorSetLayout
+
     private lateinit var textureDescriptorSetLayout: DescriptorSetLayout.SamplerDescriptorSetLayout
+    private lateinit var textureSampler: TextureSampler
     private lateinit var descriptorSetMap: MutableMap<String, TextureDescriptorSet>
+
+    private lateinit var uniformDescriptorSetLayout: DescriptorSetLayout.UniformDescriptorSetLayout
     private lateinit var projMatrixUniform: VulkanBuffer
     private lateinit var projMatrixDescriptorSet: DescriptorSet.UniformDescriptorSet
-    private lateinit var textureSampler: TextureSampler
+    private lateinit var viewMatricesBuffer: Array<VulkanBuffer>
+    private lateinit var viewMatricesDescriptorSets: Array<DescriptorSet.UniformDescriptorSet>
+
+    private lateinit var materialDescriptorSetLayout: DescriptorSetLayout.DynUniformDescriptorSetLayout
+    private var materialSize: Int
+    private lateinit var materialsBuffer: VulkanBuffer
+    private lateinit var materialDescriptorSet: DescriptorSet.DynUniformDescriptorSet
+
 
     init {
         device = swapChain.device
@@ -44,6 +56,8 @@ class ForwardRenderActivity(
         MemoryStack.stackPush().use { stack ->
             val device = swapChain.device
             val imageViews = swapChain.imageViews
+
+            materialSize = calcMaterialsUniformSize()
 
             createDepthImages()
             renderPass = SwapChainRenderPass(swapChain, depthAttachments[0].image.format)
@@ -57,10 +71,10 @@ class ForwardRenderActivity(
                 ShaderProgram.ShaderModuleData(VK_SHADER_STAGE_VERTEX_BIT, VERTEX_SHADER_FILE_SPV),
                 ShaderProgram.ShaderModuleData(VK_SHADER_STAGE_FRAGMENT_BIT, FRAGMENT_SHADER_FILE_SPV),
             ))
-            createDescriptorSets()
+            createDescriptorSets(swapChain.imageViews.size)
 
             val pipelineCreationInfo = Pipeline.PipelineCreationInfo(
-                renderPass.vkRenderPass, fwdShaderProgram, 1, true, GraphConstants.MAT4X4_SIZE,  VertexBufferStructure(), descriptorSetLayouts)
+                renderPass.vkRenderPass, fwdShaderProgram, 1, true, true, GraphConstants.MAT4X4_SIZE,  VertexBufferStructure(), descriptorSetLayouts)
             pipeline = Pipeline(pipelineCache, pipelineCreationInfo)
             pipelineCreationInfo.cleanup()
 
@@ -78,17 +92,33 @@ class ForwardRenderActivity(
     }
 
     fun cleanup() {
+        materialsBuffer.cleanup()
+        viewMatricesBuffer.forEach(VulkanBuffer::cleanup)
         projMatrixUniform.cleanup()
         textureSampler.cleanup()
         descriptorPool.cleanup()
         pipeline.cleanup()
-        descriptorSetLayouts.forEach(DescriptorSetLayout::cleanup)
+        uniformDescriptorSetLayout.cleanup()
+        textureDescriptorSetLayout.cleanup()
+        materialDescriptorSetLayout.cleanup()
         depthAttachments.forEach(Attachment::cleanup)
         fwdShaderProgram.cleanup()
         frameBuffers.forEach(FrameBuffer::cleanup)
         renderPass.cleanup()
         commandBuffers.forEach(CommandBuffer::cleanup)
         fences.forEach(Fence::cleanup)
+    }
+
+    private fun calcMaterialsUniformSize(): Int {
+        val minUboAlignment = device.physicalDevice.vkPhysicalDeviceProperties.limits().minUniformBufferOffsetAlignment()
+        // As dor my understanding we need to know how many grid size to use for each batch
+        // 1 batch = 9 Vec4
+        // 1 batch / gridSize(minUboAlignment) = number of grids
+        // +1 for buffer
+        val mult = (GraphConstants.VEC4_SIZE * 9) / minUboAlignment + 1
+
+        // translate the batch size (number of grid lines) to the actual size
+        return (mult * minUboAlignment).toInt()
     }
 
     private fun createDepthImages() {
@@ -112,17 +142,21 @@ class ForwardRenderActivity(
         }
     }
 
-    private fun createDescriptorSets() {
+    private fun createDescriptorSets(numImages: Int) {
         uniformDescriptorSetLayout = DescriptorSetLayout.UniformDescriptorSetLayout(device, 0, VK_SHADER_STAGE_VERTEX_BIT)
         textureDescriptorSetLayout = DescriptorSetLayout.SamplerDescriptorSetLayout(device, 0, VK_SHADER_STAGE_FRAGMENT_BIT)
+        materialDescriptorSetLayout = DescriptorSetLayout.DynUniformDescriptorSetLayout(device, 0, VK_SHADER_STAGE_FRAGMENT_BIT)
         descriptorSetLayouts = arrayOf(
             uniformDescriptorSetLayout,
-            textureDescriptorSetLayout
+            uniformDescriptorSetLayout,
+            textureDescriptorSetLayout,
+            materialDescriptorSetLayout
         )
 
         val descriptorTypeCounts = listOf(
-            DescriptorPool.DescriptorTypeCount(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER),
-            DescriptorPool.DescriptorTypeCount(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+            DescriptorPool.DescriptorTypeCount(numImages + 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER),
+            DescriptorPool.DescriptorTypeCount(EngineProperties.maxMaterials, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
+            DescriptorPool.DescriptorTypeCount(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC),
         )
         descriptorPool = DescriptorPool(device, descriptorTypeCounts)
 
@@ -130,6 +164,12 @@ class ForwardRenderActivity(
         textureSampler = TextureSampler(device, 1, true)
         projMatrixUniform = VulkanBuffer(device, GraphConstants.MAT4X4_SIZE.toLong(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
         projMatrixDescriptorSet = DescriptorSet.UniformDescriptorSet(descriptorPool, uniformDescriptorSetLayout, projMatrixUniform, 0)
+
+        viewMatricesBuffer = Array(numImages) { VulkanBuffer(device, GraphConstants.MAT4X4_SIZE.toLong(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) }
+        viewMatricesDescriptorSets = Array(numImages) { i -> DescriptorSet.UniformDescriptorSet(descriptorPool, uniformDescriptorSetLayout, viewMatricesBuffer[i], 0) }
+
+        materialsBuffer = VulkanBuffer(device, (materialSize * EngineProperties.maxMaterials).toLong(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+        materialDescriptorSet = DescriptorSet.DynUniformDescriptorSet(descriptorPool, materialDescriptorSetLayout, materialsBuffer, 0, materialSize.toLong())
     }
 
     fun recordCommandBuffer(vulkanModelList: List<VulkanModel>) {
@@ -173,41 +213,59 @@ class ForwardRenderActivity(
                 .offset { it.x(0).y(0) }
             vkCmdSetScissor(cmdHandle, 0, scissor)
 
-            val offsets = stack.mallocLong(1)
-            offsets.put(0, 0.toLong())
-            val vertexBuffer = stack.mallocLong(1)
-            val descriptorSets = stack.mallocLong(2)
+
+            val descriptorSets = stack.mallocLong(4)
                 .put(0, projMatrixDescriptorSet.vkDescriptorSet)
-            vulkanModelList.forEach modelScope@ { vulkanModel ->
-                val modelId = vulkanModel.modelId
-                val entities = scene.entitiesMap[modelId]
-                if (entities?.isNotEmpty() != true) {
-                    return@modelScope
-                }
-                vulkanModel.vulkanMaterialList.forEach materialScope@ { material ->
-                    if (material.vulkanMeshList.isEmpty()) {
-                        return@materialScope
-                    }
-                    val textureDescriptorSet = descriptorSetMap[material.texture.fileName]!!
-                    descriptorSets.put(1, textureDescriptorSet.vkDescriptorSet)
+                .put(1, viewMatricesDescriptorSets[idx].vkDescriptorSet)
+                .put(3, materialDescriptorSet.vkDescriptorSet)
+            VulkanUtils.copyMatrixToBuffer(viewMatricesBuffer[idx], scene.camera.viewMatrix)
 
-                    material.vulkanMeshList.forEach meshScope@ { mesh ->
-                        vertexBuffer.put(0, mesh.verticesBuffer.buffer)
-                        vkCmdBindVertexBuffers(cmdHandle, 0, vertexBuffer, offsets)
-                        vkCmdBindIndexBuffer(cmdHandle, mesh.indicesBuffer.buffer, 0, VK_INDEX_TYPE_UINT32)
-
-                        entities.forEach { entity ->
-                            vkCmdBindDescriptorSets(cmdHandle, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.vkPipelineLayout, 0, descriptorSets, null)
-
-                            VulkanUtils.setMatrixAsPushConstant(pipeline, cmdHandle, entity.modelMatrix)
-                            vkCmdDrawIndexed(cmdHandle, mesh.numIndices, 1, 0, 0, 0)
-                        }
-                    }
-                }
-            }
+           recordEntities(stack, cmdHandle, descriptorSets, vulkanModelList)
 
             vkCmdEndRenderPass(cmdHandle)
             commandBuffer.endRecording()
+        }
+    }
+
+    private fun recordEntities(stack: MemoryStack, cmdHandle: VkCommandBuffer, descriptorSets: LongBuffer, vulkanModelList: List<VulkanModel>) {
+        val offsets = stack.mallocLong(1)
+        offsets.put(0, 0.toLong())
+        val vertexBuffer = stack.mallocLong(1)
+        val dynDescrSetOffset = stack.callocInt(1)
+        var materialCount = 0
+
+        vulkanModelList.forEach modelScope@ { vulkanModel ->
+            val modelId = vulkanModel.modelId
+            val entities = scene.entitiesMap[modelId]
+            if (entities?.isNotEmpty() != true) {
+                materialCount += vulkanModel.vulkanMaterialList.size
+                return@modelScope
+            }
+            vulkanModel.vulkanMaterialList.forEach materialScope@ { material ->
+                if (material.vulkanMeshList.isEmpty()) {
+                    materialCount += 1
+                    return@materialScope
+                }
+                val materialOffset = materialCount * materialSize
+                dynDescrSetOffset.put(0, materialOffset)
+                val textureDescriptorSet = descriptorSetMap[material.texture.fileName]!!
+                descriptorSets.put(2, textureDescriptorSet.vkDescriptorSet)
+
+                material.vulkanMeshList.forEach meshScope@ { mesh ->
+                    vertexBuffer.put(0, mesh.verticesBuffer.buffer)
+                    vkCmdBindVertexBuffers(cmdHandle, 0, vertexBuffer, offsets)
+                    vkCmdBindIndexBuffer(cmdHandle, mesh.indicesBuffer.buffer, 0, VK_INDEX_TYPE_UINT32)
+
+                    entities.forEach { entity ->
+                        vkCmdBindDescriptorSets(cmdHandle, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pipeline.vkPipelineLayout, 0, descriptorSets, dynDescrSetOffset)
+
+                        VulkanUtils.setMatrixAsPushConstant(pipeline, cmdHandle, entity.modelMatrix)
+                        vkCmdDrawIndexed(cmdHandle, mesh.numIndices, 1, 0, 0, 0)
+                    }
+                }
+                materialCount += 1
+            }
         }
     }
 
@@ -231,19 +289,31 @@ class ForwardRenderActivity(
 
     fun registerModels(vulkanModelList: List<VulkanModel>) {
         device.waitIdle()
+        var materialCount = 0
         vulkanModelList.forEach { vulkanModel ->
             vulkanModel.vulkanMaterialList.forEach materialScope@ { vulkanMaterial ->
-                if (vulkanMaterial.vulkanMeshList.isEmpty()) {
-                    return@materialScope
-                }
+                val materialOffset = materialCount * materialSize
                 updateTextureDescriptorSet(vulkanMaterial.texture)
+                updateMaterialsBuffer(materialsBuffer, vulkanMaterial, materialOffset)
+                materialCount += 1
+//                if (vulkanMaterial.vulkanMeshList.isEmpty()) {
+//                    return@materialScope
+//                }
+//                updateTextureDescriptorSet(vulkanMaterial.texture)
             }
         }
     }
 
-    fun updateTextureDescriptorSet(texture: Texture) {
+    private fun updateTextureDescriptorSet(texture: Texture) {
         val fileName = texture.fileName
         descriptorSetMap.getOrPut(fileName) { TextureDescriptorSet(descriptorPool, textureDescriptorSetLayout, texture, textureSampler, 0) }
+    }
+
+    private fun updateMaterialsBuffer(vulkanBuffer: VulkanBuffer, material: VulkanModel.VulkanMaterial, offset: Int) {
+        val mappedMemory = vulkanBuffer.map()
+        val materialBuffer = MemoryUtil.memByteBuffer(mappedMemory, vulkanBuffer.requestedSize.toInt())
+        material.diffuseColor.get(offset, materialBuffer)
+        vulkanBuffer.unMap()
     }
 
     fun resize(swapChain: SwapChain) {

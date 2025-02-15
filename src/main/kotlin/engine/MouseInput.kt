@@ -34,12 +34,12 @@ class MouseInput(windowHandle: Long) {
         displVec.x = 0f
         displVec.y = 0f
 
-        if (previousPos.x  >= 0 && previousPos.y >= 0 && inWindow) {
+        if (previousPos.x >= 0 && previousPos.y >= 0 && inWindow) {
             displVec.x = currentPos.y - previousPos.y
             displVec.y = currentPos.x - previousPos.x
         }
 
-        previousPos.x = previousPos.x
-        previousPos.y = previousPos.y
+        previousPos.x = currentPos.x
+        previousPos.y = currentPos.y
     }
 }

@@ -11,6 +11,7 @@ object EngineProperties {
     private const val DEFAULT_Z_NEAR = 1.0f
     private const val DEFAULT_Z_FAR = 100f
     private const val DEFAULT_DEFAULT_TEXTURE_PATH = "resources/models/default/default.png"
+    private const val DEFAULT_MAX_MATERIALS = 500
 
     val ups: Int
     val validate: Boolean
@@ -22,6 +23,7 @@ object EngineProperties {
     val zNear: Float
     val zFar: Float
     val defaultTexturePath: String
+    val maxMaterials: Int
 
     init {
         // Reading properties file
@@ -38,6 +40,7 @@ object EngineProperties {
             zNear = props.getOrDefault("zNear", DEFAULT_Z_NEAR).toString().toFloat()
             zFar = props.getOrDefault("zFar", DEFAULT_Z_FAR).toString().toFloat()
             defaultTexturePath = props.getOrDefault("defaultTexturePath", DEFAULT_DEFAULT_TEXTURE_PATH)
+            maxMaterials = props.getOrDefault("maxMaterials", DEFAULT_MAX_MATERIALS).toString().toInt()
         }
     }
 

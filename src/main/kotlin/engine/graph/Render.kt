@@ -4,8 +4,10 @@ import com.maorbarak.engine.EngineProperties
 import com.maorbarak.engine.scene.Scene
 import com.maorbarak.engine.Window
 import com.maorbarak.engine.graph.vk.*
+import com.maorbarak.engine.graph.vk.Queue
 import com.maorbarak.engine.scene.ModelData
 import org.tinylog.kotlin.Logger
+import java.util.*
 
 class Render(
     val window: Window,
@@ -67,6 +69,14 @@ class Render(
         Logger.debug("Loading ${modelDataList.size} model(s)")
         vulkanModels.addAll(VulkanModel.transformModels(modelDataList, textureCache, commandPool, graphicsQueue))
         Logger.debug("Loaded ${modelDataList.size} model(s)")
+
+        // Reorder materials inside models
+        vulkanModels.forEach { model ->
+            model.vulkanMaterialList.sortBy { it.isTransparent }
+        }
+
+        // Reorder models
+        vulkanModels.sortBy { model -> model.vulkanMaterialList.any { it.isTransparent } }
 
         fwdRenderActivity.registerModels(vulkanModels)
     }

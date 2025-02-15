@@ -8,11 +8,13 @@ class Scene (
 
     val entitiesMap: HashMap<String, MutableList<Entity>>
     val projection: Projection
+    val camera: Camera
 
     init {
         entitiesMap = hashMapOf()
         projection = Projection()
         projection.resize(window.width, window.height)
+        camera = Camera()
     }
 
     fun addEntity(entity: Entity) {

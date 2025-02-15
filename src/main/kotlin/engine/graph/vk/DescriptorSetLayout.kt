@@ -50,4 +50,7 @@ abstract class DescriptorSetLayout(
     class UniformDescriptorSetLayout(device: Device, binding: Int, stage: Int):
         SimpleDescriptorSetLayout(device, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, binding, stage)
 
+    class DynUniformDescriptorSetLayout(device: Device, binding: Int, stage: Int):
+            SimpleDescriptorSetLayout(device, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, binding, stage)
+
 }
