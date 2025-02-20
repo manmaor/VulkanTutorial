@@ -1,6 +1,7 @@
-package com.maorbarak.engine.graph
+package com.maorbarak.engine.graph.fwd
 
 import com.maorbarak.engine.EngineProperties
+import com.maorbarak.engine.graph.VulkanModel
 import com.maorbarak.engine.graph.vk.*
 import com.maorbarak.engine.graph.vk.Queue
 import com.maorbarak.engine.scene.Scene

@@ -1,5 +1,6 @@
-package com.maorbarak.engine.graph.vk
+package com.maorbarak.engine.graph.fwd
 
+import com.maorbarak.engine.graph.vk.SwapChain
 import com.maorbarak.engine.graph.vk.VulkanUtils.vkCheck
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.vulkan.*

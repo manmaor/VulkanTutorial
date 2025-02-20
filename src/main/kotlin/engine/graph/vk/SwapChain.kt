@@ -210,15 +210,18 @@ class SwapChain(
 
     data class SyncSemaphores(
         val imgAcquisitionSemaphore: Semaphore,
+        val geometryCompleteSemaphore: Semaphore,
         val renderCompleteSemaphore: Semaphore
     ) {
         constructor(device: Device): this(
             imgAcquisitionSemaphore = Semaphore(device = device),
+            geometryCompleteSemaphore = Semaphore(device = device),
             renderCompleteSemaphore = Semaphore(device = device)
         )
 
         fun cleanup() {
             imgAcquisitionSemaphore.cleanup()
+            geometryCompleteSemaphore.cleanup()
             renderCompleteSemaphore.cleanup()
         }
     }
