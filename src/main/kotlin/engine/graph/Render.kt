@@ -24,7 +24,6 @@ class Render(
     private val surface: Surface
     private var swapChain: SwapChain
     private val commandPool: CommandPool
-//    private val fwdRenderActivity: ForwardRenderActivity
     private val geometryRenderActivity: GeometryRenderActivity
     private val lightingRenderActivity: LightingRenderActivity
     private val pipelineCache: PipelineCache
@@ -50,8 +49,7 @@ class Render(
         pipelineCache = PipelineCache(device)
         geometryRenderActivity = GeometryRenderActivity(swapChain, commandPool, pipelineCache, scene)
         lightingRenderActivity = LightingRenderActivity(swapChain, commandPool, pipelineCache,
-            geometryRenderActivity.geometryFrameBuffer.geometryAttachments.attachments)
-//        fwdRenderActivity = ForwardRenderActivity(swapChain, commandPool, pipelineCache, scene)
+            geometryRenderActivity.geometryFrameBuffer.geometryAttachments.attachments, scene)
         vulkanModels = mutableListOf()
         textureCache = TextureCache()
     }
@@ -64,7 +62,6 @@ class Render(
         textureCache.cleanup()
         vulkanModels.forEach(VulkanModel::cleanup)
         pipelineCache.cleanup()
-//        fwdRenderActivity.cleanup()
         lightingRenderActivity.cleanup()
         geometryRenderActivity.cleanup()
         commandPool.cleanup()
@@ -81,12 +78,12 @@ class Render(
         Logger.debug("Loaded ${modelDataList.size} model(s)")
 
         // Reorder materials inside models
-        vulkanModels.forEach { model ->
-            model.vulkanMaterialList.sortBy { it.isTransparent }
-        }
+//        vulkanModels.forEach { model ->
+//            model.vulkanMaterialList.sortBy { it.isTransparent }
+//        }
 
         // Reorder models
-        vulkanModels.sortBy { model -> model.vulkanMaterialList.any { it.isTransparent } }
+//        vulkanModels.sortBy { model -> model.vulkanMaterialList.any { it.isTransparent } }
 
         geometryRenderActivity.registerModels(vulkanModels)
     }

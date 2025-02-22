@@ -22,17 +22,45 @@ class VertexBufferStructure: VertexInputStateInfo() {
             .offset(0)
 
         i += 1
+        // Normals
+        viAttrs[i]
+            .binding(0)
+            .location(i)
+            .format(VK_FORMAT_R32G32B32_SFLOAT)
+            .offset(POSITION_COMPONENTS * GraphConstants.FLOAT_LENGTH)
+
+        i += 1
+        // Tangents
+        viAttrs[i]
+            .binding(0)
+            .location(i)
+            .format(VK_FORMAT_R32G32B32_SFLOAT)
+            .offset(NORMAL_COMPONENTS * GraphConstants.FLOAT_LENGTH + POSITION_COMPONENTS * GraphConstants.FLOAT_LENGTH)
+
+        i += 1
+        // BiTangents
+        viAttrs[i]
+            .binding(0)
+            .location(i)
+            .format(VK_FORMAT_R32G32B32_SFLOAT)
+            .offset(NORMAL_COMPONENTS  * GraphConstants.FLOAT_LENGTH * 2 + POSITION_COMPONENTS * GraphConstants.FLOAT_LENGTH)
+
+        i += 1
         // Texture coordinates
         viAttrs[i]
             .binding(0)
             .location(i)
             .format(VK_FORMAT_R32G32_SFLOAT)
-            .offset(POSITION_COMPONENTS * GraphConstants.FLOAT_LENGTH)
+            .offset(NORMAL_COMPONENTS  * GraphConstants.FLOAT_LENGTH * 3 + POSITION_COMPONENTS * GraphConstants.FLOAT_LENGTH)
 
 
         viBindings[0]
             .binding(0)
-            .stride(POSITION_COMPONENTS * GraphConstants.FLOAT_LENGTH + TEXT_COORD_COMPONENTS * GraphConstants.FLOAT_LENGTH)
+            .stride(
+                POSITION_COMPONENTS * GraphConstants.FLOAT_LENGTH +
+                        NORMAL_COMPONENTS * GraphConstants.FLOAT_LENGTH * 3 +
+                        TEXT_COORD_COMPONENTS * GraphConstants.FLOAT_LENGTH
+            )
             .inputRate(VK_VERTEX_INPUT_RATE_VERTEX)
 
         vi!!
@@ -48,8 +76,9 @@ class VertexBufferStructure: VertexInputStateInfo() {
     }
 
     companion object {
-        const val NUMBER_OF_ATTRIBUTES = 2
+        const val NUMBER_OF_ATTRIBUTES = 5
         const val POSITION_COMPONENTS = 3
+        const val NORMAL_COMPONENTS = 3
         const val TEXT_COORD_COMPONENTS = 2
     }
 }

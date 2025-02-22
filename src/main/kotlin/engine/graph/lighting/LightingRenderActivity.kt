@@ -3,6 +3,10 @@ package com.maorbarak.engine.graph.lighting
 import com.maorbarak.engine.EngineProperties
 import com.maorbarak.engine.graph.VulkanModel
 import com.maorbarak.engine.graph.vk.*
+import com.maorbarak.engine.scene.Light
+import com.maorbarak.engine.scene.Scene
+import org.joml.Matrix4f
+import org.joml.Vector4f
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil
 import org.lwjgl.util.shaderc.Shaderc
@@ -15,10 +19,12 @@ class LightingRenderActivity(
     private var swapChain: SwapChain,
     commandPool: CommandPool,
     val pipelineCache: PipelineCache,
-    val attachments: List<Attachment>
+    val attachments: List<Attachment>,
+    val scene: Scene
 ) {
     val device: Device
     val lightingFrameBuffer: LightingFrameBuffer
+    val auxVec: Vector4f
 
     private lateinit var commandBuffers: Array<CommandBuffer>
     private lateinit var fences: Array<Fence>
@@ -28,18 +34,31 @@ class LightingRenderActivity(
     // Descriptors
     private lateinit var descriptorPool: DescriptorPool
     private lateinit var descriptorSetLayouts: Array<DescriptorSetLayout>
+
     private lateinit var attachmentsLayout: AttachmentsLayout
+    private lateinit var uniformDescriptorSetLayout: DescriptorSetLayout.UniformDescriptorSetLayout
+
     private lateinit var attachmentsDescriptorSet: AttachmentsDescriptorSet
+
+    private lateinit var invProjBuffer: VulkanBuffer
+    private lateinit var invProjMatrixDescriptorSet: DescriptorSet.UniformDescriptorSet
+
+    private lateinit var lightsBuffer: Array<VulkanBuffer>
+    private lateinit var lightsDescriptorSet: Array<DescriptorSet.UniformDescriptorSet>
+
 
     init {
         device = swapChain.device
+        auxVec = Vector4f()
         lightingFrameBuffer = LightingFrameBuffer(swapChain)
 
         createShaders()
         createDescriptorPool(attachments)
-        createDescriptorSets(attachments)
+        createUniforms(swapChain.numImages)
+        createDescriptorSets(attachments, swapChain.numImages)
         createPipeline(pipelineCache)
         createCommandBuffers(commandPool, swapChain.numImages)
+        updateInvProjMatrix()
 
         (0..<swapChain.numImages).forEach { i ->
             preRecordCommandBuffer(i)
@@ -47,10 +66,13 @@ class LightingRenderActivity(
     }
 
     fun cleanup() {
+        uniformDescriptorSetLayout.cleanup()
         attachmentsDescriptorSet.cleanup();
         attachmentsLayout.cleanup();
         descriptorPool.cleanup();
+        lightsBuffer.forEach(VulkanBuffer::cleanup)
         pipeline.cleanup();
+        invProjBuffer.cleanup()
         lightingFrameBuffer.cleanup();
         shaderProgram.cleanup();
         commandBuffers.forEach(CommandBuffer::cleanup);
@@ -71,16 +93,39 @@ class LightingRenderActivity(
     private fun createDescriptorPool(attachments: List<Attachment>) {
         descriptorPool = DescriptorPool(device, listOf(
             DescriptorPool.DescriptorTypeCount(attachments.size, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
+            DescriptorPool.DescriptorTypeCount(swapChain.numImages + 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
         ))
     }
 
-    private fun createDescriptorSets(attachments: List<Attachment>) {
+    private fun createUniforms(numImages: Int) {
+        invProjBuffer = VulkanBuffer(device, GraphConstants.MAT4X4_SIZE.toLong(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+
+        lightsBuffer = Array(numImages) {
+            VulkanBuffer(device,
+                GraphConstants.INT_LENGTH.toLong() * 4 + // number of light (1 int), not sure that the rest are
+                        GraphConstants.VEC4_SIZE * 2 * GraphConstants.MAX_LIGHTS + // each light has position and color (2 vec4)
+                        GraphConstants.VEC4_SIZE, // ambient light color
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+            )
+        }
+    }
+
+    private fun createDescriptorSets(attachments: List<Attachment>, numImages: Int) {
         attachmentsLayout = AttachmentsLayout(device, attachments.size)
+        uniformDescriptorSetLayout = DescriptorSetLayout.UniformDescriptorSetLayout(device, 0, VK_SHADER_STAGE_FRAGMENT_BIT)
         descriptorSetLayouts = arrayOf(
-            attachmentsLayout
+            attachmentsLayout,
+            uniformDescriptorSetLayout,
+            uniformDescriptorSetLayout
         )
 
         attachmentsDescriptorSet = AttachmentsDescriptorSet(descriptorPool, attachmentsLayout, attachments, 0)
+        invProjMatrixDescriptorSet = DescriptorSet.UniformDescriptorSet(descriptorPool, uniformDescriptorSetLayout, invProjBuffer, 0)
+
+        lightsDescriptorSet = Array(numImages) { i ->
+            DescriptorSet.UniformDescriptorSet(descriptorPool, uniformDescriptorSetLayout, lightsBuffer[i], 0)
+        }
     }
 
     private fun createPipeline(pipelineCache: PipelineCache) {
@@ -145,8 +190,10 @@ class LightingRenderActivity(
                 .offset { it.x(0).y(0) }
             vkCmdSetScissor(cmdHandle, 0, scissor)
 
-            val descriptorSets = stack.mallocLong(1)
+            val descriptorSets = stack.mallocLong(3)
                 .put(0, attachmentsDescriptorSet.vkDescriptorSet)
+                .put(1, lightsDescriptorSet[idx].vkDescriptorSet)
+                .put(2, invProjMatrixDescriptorSet.vkDescriptorSet)
             vkCmdBindDescriptorSets(cmdHandle, VK_PIPELINE_BIND_POINT_GRAPHICS,
                 pipeline.vkPipelineLayout, 0, descriptorSets, null)
 
@@ -165,6 +212,33 @@ class LightingRenderActivity(
 
         fence.fenceWait()
         fence.reset()
+
+        updateLights(scene.ambientLight, scene.lights, scene.camera.viewMatrix, lightsBuffer[idx])
+    }
+
+    private fun updateLights(ambientLight: Vector4f, lights: Array<Light>, viewMatrix: Matrix4f, lightsBuffer: VulkanBuffer) {
+        val mappedMemory = lightsBuffer.map()
+        val uniformBuffer = MemoryUtil.memByteBuffer(mappedMemory, lightsBuffer.requestedSize.toInt())
+
+        ambientLight.get(0, uniformBuffer)
+
+        var offset = GraphConstants.VEC4_SIZE
+
+        uniformBuffer.putInt(offset, lights.size)
+        offset += GraphConstants.VEC4_SIZE
+
+
+        lights.forEach { light ->
+            auxVec.set(light.position)
+            auxVec.mul(viewMatrix)
+            auxVec.w = light.position.w
+            auxVec.get(offset, uniformBuffer)
+            offset += GraphConstants.VEC4_SIZE
+            light.color.get(offset, uniformBuffer)
+            offset += GraphConstants.VEC4_SIZE
+        }
+
+        lightsBuffer.unMap()
     }
 
     fun submit(queue: Queue) {
@@ -188,17 +262,18 @@ class LightingRenderActivity(
         this.swapChain = swapChain
         attachmentsDescriptorSet.update(attachments)
         lightingFrameBuffer.resize(swapChain)
+
+        updateInvProjMatrix()
+
         (0..<swapChain.numImages).forEach { i ->
             preRecordCommandBuffer(i)
         }
     }
 
-//
-//    fun waitForFence() {
-//        val idx = swapChain.currentFrame
-//        val fence = fences[idx]
-//        fence.fenceWait()
-//    }
+    private fun updateInvProjMatrix() {
+        val invProj = Matrix4f(scene.projection.projectionMatrix).invert()
+        VulkanUtils.copyMatrixToBuffer(invProjBuffer, invProj)
+    }
 
 
     companion object {

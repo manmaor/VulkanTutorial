@@ -99,7 +99,7 @@ class GeometryRenderActivity(
     private fun createDescriptorPool() {
         descriptorPool = DescriptorPool(device, listOf(
             DescriptorPool.DescriptorTypeCount(swapChain.numImages + 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER),
-            DescriptorPool.DescriptorTypeCount(EngineProperties.maxMaterials, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER), // I think it's because in one render call we can send up maxMaterials materials to a single draw call
+            DescriptorPool.DescriptorTypeCount(EngineProperties.maxMaterials * 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER), // I think it's because in one render call we can send up maxMaterials materials to a single draw call
             DescriptorPool.DescriptorTypeCount(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
         ))
     }
@@ -111,6 +111,8 @@ class GeometryRenderActivity(
         geometryDescriptorSetLayouts = arrayOf(
             uniformDescriptorSetLayout,
             uniformDescriptorSetLayout,
+            textureDescriptorSetLayout,
+            textureDescriptorSetLayout,
             textureDescriptorSetLayout,
             materialDescriptorSetLayout
         )
@@ -154,6 +156,8 @@ class GeometryRenderActivity(
             vulkanModel.vulkanMaterialList.forEach materialScope@ { vulkanMaterial ->
                 val materialOffset = materialCount * materialSize
                 updateTextureDescriptorSet(vulkanMaterial.texture)
+                updateTextureDescriptorSet(vulkanMaterial.normalMapTexture)
+                updateTextureDescriptorSet(vulkanMaterial.metalRoughTexture)
                 updateMaterialsBuffer(materialsBuffer, vulkanMaterial, materialOffset)
                 materialCount += 1
             }
@@ -169,6 +173,13 @@ class GeometryRenderActivity(
         val mappedMemory = vulkanBuffer.map()
         val materialBuffer = MemoryUtil.memByteBuffer(mappedMemory, vulkanBuffer.requestedSize.toInt())
         material.diffuseColor.get(offset, materialBuffer)
+        materialBuffer.apply {
+            putFloat(offset + GraphConstants.FLOAT_LENGTH * 4, if (material.hasTexture) 1.0f else 0.0f)
+            putFloat(offset + GraphConstants.FLOAT_LENGTH * 5, if (material.hasNormalMapTexture) 1.0f else 0.0f)
+            putFloat(offset + GraphConstants.FLOAT_LENGTH * 6, if (material.hasMetalRoughTexture) 1.0f else 0.0f)
+            putFloat(offset + GraphConstants.FLOAT_LENGTH * 7, material.roughnessFactor)
+            putFloat(offset + GraphConstants.FLOAT_LENGTH * 8, material.metallicFactor)
+        }
         vulkanBuffer.unMap()
     }
 
@@ -219,10 +230,10 @@ class GeometryRenderActivity(
             vkCmdSetScissor(cmdHandle, 0, scissor)
 
 
-            val descriptorSets = stack.mallocLong(4)
+            val descriptorSets = stack.mallocLong(6)
                 .put(0, projMatrixDescriptorSet.vkDescriptorSet)
                 .put(1, viewMatricesDescriptorSets[idx].vkDescriptorSet)
-                .put(3, materialsDescriptorSet.vkDescriptorSet)
+                .put(5, materialsDescriptorSet.vkDescriptorSet)
             VulkanUtils.copyMatrixToBuffer(viewMatricesBuffer[idx], scene.camera.viewMatrix)
 
             recordEntities(stack, cmdHandle, descriptorSets, vulkanModelList)
@@ -254,7 +265,13 @@ class GeometryRenderActivity(
                 val materialOffset = materialCount * materialSize
                 dynDescrSetOffset.put(0, materialOffset)
                 val textureDescriptorSet = descriptorSetMap[material.texture.fileName]!!
+                val normalMapDescriptorSet = descriptorSetMap[material.normalMapTexture.fileName]!!
+                val metalRoughDescriptorSet = descriptorSetMap[material.metalRoughTexture.fileName]!!
+
+                // In chap11 they moved this to the entity loop bellow
                 descriptorSets.put(2, textureDescriptorSet.vkDescriptorSet)
+                descriptorSets.put(3, normalMapDescriptorSet.vkDescriptorSet)
+                descriptorSets.put(4, metalRoughDescriptorSet.vkDescriptorSet)
 
                 material.vulkanMeshList.forEach meshScope@ { mesh ->
                     vertexBuffer.put(0, mesh.verticesBuffer.buffer)
