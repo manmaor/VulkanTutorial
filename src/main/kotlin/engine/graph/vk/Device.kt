@@ -9,10 +9,12 @@ import org.lwjgl.vulkan.VK10.*
 import org.tinylog.kotlin.Logger
 
 class Device(
+    instance: Instance,
     val physicalDevice: PhysicalDevice
 ) {
     val vkDevice: VkDevice
     val isSamplerAnisotropy: Boolean
+    val memoryAllocator: MemoryAllocator
 
     init {
         Logger.debug("Creating device")
@@ -61,11 +63,14 @@ class Device(
                 "Failed to create device")
 
             vkDevice = VkDevice(devicePointer[0], physicalDevice.vkPhysicalDevice, deviceCreateInfo)
+
+            memoryAllocator = MemoryAllocator(instance, physicalDevice, vkDevice)
         }
     }
 
     fun cleanup() {
         Logger.debug("Destroying Vulkan device")
+        memoryAllocator.cleanup()
         vkDestroyDevice(vkDevice, null)
     }
 
@@ -77,24 +82,6 @@ class Device(
             .also {
                 Logger.debug("Supported device extensions $it");
             }
-
-//    private fun getDeviceExtensions(): Set<String> {
-//        MemoryStack.stackPush().use { stack ->
-//            val numExtensionsBuf = stack.callocInt(1)
-//            vkEnumerateDeviceExtensionProperties(physicalDevice.vkPhysicalDevice, null as String?, numExtensionsBuf, null)
-//            val numExtensions = numExtensionsBuf[0]
-//            Logger.debug("Device supports [{}] extensions", numExtensions)
-//
-//            val propsBuff = VkExtensionProperties.calloc(numExtensions, stack)
-//            vkEnumerateDeviceExtensionProperties(physicalDevice.vkPhysicalDevice, null as String?, numExtensionsBuf, propsBuff)
-//            return propsBuff
-//                .map { it.extensionNameString() }
-//                .toSet()
-//                .also {
-//                    Logger.debug("!!Supported device extensions $it")
-//                }
-//        }
-//    }
 
     /**
      * Waits for all operations for complete

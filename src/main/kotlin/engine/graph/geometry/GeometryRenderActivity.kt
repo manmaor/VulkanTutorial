@@ -119,13 +119,13 @@ class GeometryRenderActivity(
 
         descriptorSetMap = mutableMapOf()
         textureSampler = TextureSampler(device, 1, true)
-        projMatrixUniform = VulkanBuffer(device, GraphConstants.MAT4X4_SIZE.toLong(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+        projMatrixUniform = VulkanBuffer(device, GraphConstants.MAT4X4_SIZE.toLong(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, 0)
         projMatrixDescriptorSet = DescriptorSet.UniformDescriptorSet(descriptorPool, uniformDescriptorSetLayout, projMatrixUniform, 0)
 
-        viewMatricesBuffer = Array(numImages) { VulkanBuffer(device, GraphConstants.MAT4X4_SIZE.toLong(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) }
+        viewMatricesBuffer = Array(numImages) { VulkanBuffer(device, GraphConstants.MAT4X4_SIZE.toLong(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, 0) }
         viewMatricesDescriptorSets = Array(numImages) { i -> DescriptorSet.UniformDescriptorSet(descriptorPool, uniformDescriptorSetLayout, viewMatricesBuffer[i], 0) }
 
-        materialsBuffer = VulkanBuffer(device, materialSize * EngineProperties.maxMaterials.toLong(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+        materialsBuffer = VulkanBuffer(device, materialSize * EngineProperties.maxMaterials.toLong(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, 0)
         materialsDescriptorSet = DescriptorSet.DynUniformDescriptorSet(descriptorPool, materialDescriptorSetLayout, materialsBuffer, 0, materialSize.toLong())
     }
 

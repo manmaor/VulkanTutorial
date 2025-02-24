@@ -45,12 +45,15 @@ abstract class DescriptorSetLayout(
     }
 
     class SamplerDescriptorSetLayout(device: Device, binding: Int, stage: Int):
-            SimpleDescriptorSetLayout(device, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, binding, stage)
+        SimpleDescriptorSetLayout(device, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, binding, stage)
 
     class UniformDescriptorSetLayout(device: Device, binding: Int, stage: Int):
         SimpleDescriptorSetLayout(device, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, binding, stage)
 
     class DynUniformDescriptorSetLayout(device: Device, binding: Int, stage: Int):
-            SimpleDescriptorSetLayout(device, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, binding, stage)
+        SimpleDescriptorSetLayout(device, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, binding, stage)
+
+    class StorageDescriptorSetLayout(device: Device, binding: Int, stage: Int):
+        SimpleDescriptorSetLayout(device, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, binding, stage)
 
 }

@@ -25,9 +25,9 @@ class VulkanModel(
             val bufferSize = meshData.indices.size * GraphConstants.INT_LENGTH
 
             val srcBuffer = VulkanBuffer(device, bufferSize.toLong(),
-                VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT or VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+                VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
             val dstBuffer = VulkanBuffer(device, bufferSize.toLong(),
-                VK_BUFFER_USAGE_TRANSFER_DST_BIT or VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+                VK_BUFFER_USAGE_TRANSFER_DST_BIT or VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0)
 
             val mappedMemory = srcBuffer.map()
             val data = MemoryUtil.memIntBuffer(mappedMemory, srcBuffer.requestedSize.toInt())
@@ -47,9 +47,9 @@ class VulkanModel(
             val bufferSize = numElements * GraphConstants.FLOAT_LENGTH
 
             val srcBuffer = VulkanBuffer(device, bufferSize.toLong(),
-                VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT or VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+                VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
             val dstBuffer = VulkanBuffer(device, bufferSize.toLong(),
-                VK_BUFFER_USAGE_TRANSFER_DST_BIT or VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+                VK_BUFFER_USAGE_TRANSFER_DST_BIT or VK_BUFFER_USAGE_VERTEX_BUFFER_BIT or VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0)
 
             val mappedMemory = srcBuffer.map()
             val data = MemoryUtil.memFloatBuffer(mappedMemory, srcBuffer.requestedSize.toInt())

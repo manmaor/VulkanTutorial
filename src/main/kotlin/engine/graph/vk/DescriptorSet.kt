@@ -57,5 +57,8 @@ abstract class DescriptorSet {
         SimpleDescriptorSet(descriptorPool, descriptorSetLayout, buffer, binding, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, buffer.requestedSize)
 
     class DynUniformDescriptorSet(descriptorPool: DescriptorPool, descriptorSetLayout: DescriptorSetLayout, buffer: VulkanBuffer, binding: Int, size: Long):
-            SimpleDescriptorSet(descriptorPool, descriptorSetLayout, buffer, binding, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, size)
+        SimpleDescriptorSet(descriptorPool, descriptorSetLayout, buffer, binding, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, size)
+
+    class StorageDescriptorSet(descriptorPool: DescriptorPool, descriptorSetLayout: DescriptorSetLayout, buffer: VulkanBuffer, binding: Int):
+        SimpleDescriptorSet(descriptorPool, descriptorSetLayout, buffer, binding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, buffer.requestedSize)
 }

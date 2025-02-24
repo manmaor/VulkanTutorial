@@ -35,7 +35,7 @@ class Render(
         instance = Instance(EngineProperties.validate)
 
         physicalDevice = PhysicalDevice.createPhysicalDevice(instance, EngineProperties.physDeviceName)
-        device = Device(physicalDevice)
+        device = Device(instance, physicalDevice)
 
         surface = Surface(physicalDevice, window.handle)
 

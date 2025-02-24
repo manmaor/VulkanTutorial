@@ -3,12 +3,8 @@ package com.maorbarak.engine.graph.vk
 import org.lwjgl.stb.STBImage.*
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil
+import org.lwjgl.vulkan.*
 import org.lwjgl.vulkan.VK11.*
-import org.lwjgl.vulkan.VkBufferImageCopy
-import org.lwjgl.vulkan.VkImageBlit
-import org.lwjgl.vulkan.VkImageMemoryBarrier
-import org.lwjgl.vulkan.VkImageSubresourceRange
-import org.lwjgl.vulkan.VkOffset3D
 import org.tinylog.kotlin.Logger
 import java.nio.ByteBuffer
 import kotlin.math.floor
@@ -95,7 +91,7 @@ class Texture(
     private fun createStgBuffer(device: Device, data: ByteBuffer) {
         val size = data.remaining()
         stgBuffer = VulkanBuffer(device, size.toLong(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT or VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
         val mappedMemory = stgBuffer!!.map()
         val buffer = MemoryUtil.memByteBuffer(mappedMemory, stgBuffer!!.requestedSize.toInt())
         buffer.put(data)

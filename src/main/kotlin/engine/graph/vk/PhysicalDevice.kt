@@ -69,9 +69,6 @@ class PhysicalDevice(
     }
 
 
-
-    // TODO: cleanup
-
     companion object {
         fun createPhysicalDevice(instance: Instance, preferredDeviceName: String?): PhysicalDevice {
             Logger.debug("Selecting physical devices")

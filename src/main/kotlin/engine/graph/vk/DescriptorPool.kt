@@ -6,7 +6,7 @@ import org.lwjgl.vulkan.*
 import org.lwjgl.vulkan.VK11.*
 import org.tinylog.kotlin.Logger
 
-// Pool -> Layout -> Set?
+// Pool -> Layout -> Set
 class DescriptorPool(
     val device: Device,
     descriptorTypeCounts: List<DescriptorTypeCount>
