@@ -9,6 +9,7 @@ import java.io.*
 import java.nio.file.Files
 
 import org.lwjgl.vulkan.VK11.*
+import org.lwjgl.vulkan.VkSpecializationInfo
 import org.tinylog.kotlin.Logger
 
 class ShaderProgram(
@@ -23,7 +24,7 @@ class ShaderProgram(
             shaderModules = shaderModuleData.map { data ->
                 val bytes = Files.readAllBytes(File(data.shaderSpvFile).toPath())
                 val moduleHandle = createShaderModule(bytes)
-                ShaderModule(data.shaderStage, moduleHandle)
+                ShaderModule(data.shaderStage, moduleHandle, data.specInfo)
             }
         } catch (e: IOException) {
             Logger.error("Error reading shader files", e)
@@ -54,7 +55,7 @@ class ShaderProgram(
     }
 
 
-    data class ShaderModule (val shaderStage: Int, val handle: Long)
+    data class ShaderModule (val shaderStage: Int, val handle: Long, val specInfo: VkSpecializationInfo?)
 
-    data class ShaderModuleData(val shaderStage: Int, val shaderSpvFile: String)
+    data class ShaderModuleData(val shaderStage: Int, val shaderSpvFile: String, val specInfo: VkSpecializationInfo? = null)
 }

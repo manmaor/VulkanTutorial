@@ -7,5 +7,6 @@ object GraphConstants {
     const val VEC4_SIZE = 4 * FLOAT_LENGTH
     const val MAT4X4_SIZE = 16 * FLOAT_LENGTH
     const val MAX_LIGHTS = 10
+    const val SHADOW_MAP_CASCADE_COUNT = 3
 
 }

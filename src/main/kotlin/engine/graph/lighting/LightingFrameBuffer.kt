@@ -32,7 +32,7 @@ class LightingFrameBuffer(
             val attachmentsBuff = stack.mallocLong(1)
             return Array(swapChain.numImages) { i ->
                 attachmentsBuff.put(0, swapChain.imageViews[i].vkImageView)
-                FrameBuffer(swapChain.device, width, height, attachmentsBuff, lightingRenderPass.vkRenderPass )
+                FrameBuffer(swapChain.device, width, height, attachmentsBuff, lightingRenderPass.vkRenderPass)
             }
         }
     }

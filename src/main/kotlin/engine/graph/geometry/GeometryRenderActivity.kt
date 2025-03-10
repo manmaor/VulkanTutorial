@@ -183,15 +183,24 @@ class GeometryRenderActivity(
         vulkanBuffer.unMap()
     }
 
-    fun recordCommandBuffer(vulkanModelList: List<VulkanModel>) {
+    fun beginRecording(): CommandBuffer {
+        val idx = swapChain.currentFrame
+        val commandBuffer = commandBuffers[idx]
+        commandBuffer.reset()
+        commandBuffer.beginRecording()
+        return commandBuffer
+    }
+
+    fun endRecording(commandBuffer: CommandBuffer) {
+        commandBuffer.endRecording()
+    }
+
+    fun recordCommandBuffer(commandBuffer: CommandBuffer, vulkanModelList: List<VulkanModel>) {
         MemoryStack.stackPush().use { stack ->
             val (width, height) = swapChain.swapChainExtent.run { width() to height() }
             val idx = swapChain.currentFrame
 
             val frameBuffer = geometryFrameBuffer.frameBuffer
-            val commandBuffer = commandBuffers[idx]
-
-            commandBuffer.reset()
             val attachments = geometryFrameBuffer.geometryAttachments.attachments
             val clearValues = VkClearValue.calloc(attachments.size, stack)
             attachments.forEach {
@@ -209,7 +218,6 @@ class GeometryRenderActivity(
                 .renderArea { a -> a.extent().set(width, height) }
                 .framebuffer(frameBuffer.vkFrameBuffer)
 
-            commandBuffer.beginRecording()
             val cmdHandle = commandBuffer.vkCommandBuffer
             vkCmdBeginRenderPass(cmdHandle, renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE)
 
@@ -239,7 +247,6 @@ class GeometryRenderActivity(
             recordEntities(stack, cmdHandle, descriptorSets, vulkanModelList)
 
             vkCmdEndRenderPass(cmdHandle)
-            commandBuffer.endRecording()
         }
     }
 
@@ -323,9 +330,9 @@ class GeometryRenderActivity(
 
 
     companion object {
-        const val GEOMETRY_FRAGMENT_SHADER_FILE_GLSL: String = "resources/shaders/geometry_fragment.glsl"
-        const val GEOMETRY_FRAGMENT_SHADER_FILE_SPV: String = "$GEOMETRY_FRAGMENT_SHADER_FILE_GLSL.spv"
-        const val GEOMETRY_VERTEX_SHADER_FILE_GLSL: String = "resources/shaders/geometry_vertex.glsl"
-        const val GEOMETRY_VERTEX_SHADER_FILE_SPV: String = "$GEOMETRY_VERTEX_SHADER_FILE_GLSL.spv"
+        private const val GEOMETRY_FRAGMENT_SHADER_FILE_GLSL: String = "resources/shaders/geometry_fragment.glsl"
+        private const val GEOMETRY_FRAGMENT_SHADER_FILE_SPV: String = "$GEOMETRY_FRAGMENT_SHADER_FILE_GLSL.spv"
+        private const val GEOMETRY_VERTEX_SHADER_FILE_GLSL: String = "resources/shaders/geometry_vertex.glsl"
+        private const val GEOMETRY_VERTEX_SHADER_FILE_SPV: String = "$GEOMETRY_VERTEX_SHADER_FILE_GLSL.spv"
     }
 }

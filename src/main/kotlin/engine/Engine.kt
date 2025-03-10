@@ -42,6 +42,7 @@ class Engine(
 
         var updateTime = initialTime
         while (running && !window.shouldClose()) {
+            scene.camera.hasMoved = false
             window.pollEvents()
 
             val now = System.currentTimeMillis()

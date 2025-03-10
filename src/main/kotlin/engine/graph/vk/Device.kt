@@ -40,6 +40,8 @@ class Device(
                 Logger.debug("Device supports anisotropy sampler")
                 features.samplerAnisotropy(true)
             } else { Logger.debug("Device not supporting anisotropy sampler") }
+            features.depthClamp(supportedFeatures.depthClamp()) // ???
+            features.geometryShader(true)
 
             // Enable all the queue families
             val queuePropsBuff = physicalDevice.vkQueueFamilyProps

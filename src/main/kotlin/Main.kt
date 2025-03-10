@@ -18,13 +18,9 @@ class Main: IAppLogic {
     private val MOUSE_SENSITIVITY: Float = 0.1f
     private val MOVEMENT_SPEED: Float = 0.01f
 
-    private val rotatingAngle = Vector3f(1f, 1f, 1f)
-//    private lateinit var cubeEntity: Entity
-    private lateinit var sponzaEntry: Entity
-
     private lateinit var directionalLight: Light
     private var angleInc = 0f
-    private var lightAngle = 0f
+    private var lightAngle = 90.1f
 
 
     override fun cleanup() {
@@ -32,35 +28,34 @@ class Main: IAppLogic {
 
     override fun init(window: Window, scene: Scene, render: Render) {
 
-//        val modelId = "CubeModel"
-//        val modelData = ModelLoader.loadModel(modelId, "resources/models/cube/cube.obj", "resources/models/cube")
-
         val sponzaModelId = "sponza-model"
         val sponzaModelData = ModelLoader.loadModel(sponzaModelId, "resources/models/sponza/Sponza.gltf", "resources/models/sponza")
 
-        val modelDataList = listOf(/*modelData,*/ sponzaModelData)
+        val modelDataList = listOf(sponzaModelData)
 
-//        cubeEntity = Entity("CubeEntity", modelId, Vector3f(0f, 0f, -2f))
-        sponzaEntry = Entity("SponzaEntiry", sponzaModelId, Vector3f())
+        val sponzaEntry = Entity("SponzaEntiry", sponzaModelId, Vector3f())
 
-//        scene.addEntity(cubeEntity)
         scene.addEntity(sponzaEntry)
 
         render.loadModels(modelDataList)
+
+        scene.camera.setPosition(-5f, 5f, 0f)
+        scene.camera.setRotation(Math.toRadians(20.0f), Math.toRadians(90f) )
 
 
         // Lights
         scene.ambientLight.set(.2, .2, .2, 1.0)
         val lights = mutableListOf<Light>()
         directionalLight = Light()
-        directionalLight.position.set(.0, 1.0, .0, .0)
+//        directionalLight.position.set(.0, 1.0, .0, .0)
         directionalLight.color.set(1.0, 1.0, 1.0, 1.0)
         lights.add(directionalLight)
+        updateDirectionalLight()
 
-        val light = Light()
-        light.position.set(.0, 1.0, .0, 1.0)
-        light.color.set(.0, 1.0, .0, 1.0)
-        lights.add(light)
+//        val light = Light()
+//        light.position.set(.0, 1.0, .0, 1.0)
+//        light.color.set(.0, 1.0, .0, 1.0)
+//        lights.add(light)
         scene.setLights(lights.toTypedArray())
     }
 
@@ -88,10 +83,13 @@ class Main: IAppLogic {
 
         if (window.isKeyPressed(GLFW.GLFW_KEY_LEFT)) {
             angleInc -= 0.05f
+            scene.lightChanged = true
         } else if (window.isKeyPressed(GLFW.GLFW_KEY_RIGHT)) {
             angleInc += 0.05f
+            scene.lightChanged = true
         } else {
             angleInc = 0f
+            scene.lightChanged = false
         }
         lightAngle += angleInc
         if (lightAngle < 0) {

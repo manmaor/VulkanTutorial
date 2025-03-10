@@ -17,7 +17,8 @@ class FrameBuffer(
     width: Int,
     height: Int,
     pAttachment: LongBuffer,
-    renderPass: Long
+    renderPass: Long,
+    layers: Int = 1
 ) {
 
     val vkFrameBuffer: Long
@@ -29,7 +30,7 @@ class FrameBuffer(
                 .pAttachments(pAttachment)
                 .width(width)
                 .height(height)
-                .layers(1)
+                .layers(layers)
                 .renderPass(renderPass)
 
             val lp = stack.mallocLong(1)

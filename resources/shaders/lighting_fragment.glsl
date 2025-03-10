@@ -1,20 +1,32 @@
 #version 450
 
+layout(constant_id = 0) const int SHADOW_MAP_CASCADE_COUNT = 3;
+layout(constant_id = 1) const int USE_PCF = 0; // Percentage Closer Filter
+// bias to apply when estimating if fragment are affected by a shadow
+// resuces shadows artifacts, like shadow acne
+layout(constant_id = 2) const float BIAS = 0.0005;
+layout(constant_id = 3) const int DEBUG_SHADOWS = 0;
 const float PI = 3.14159265359;
+const float SHADOW_FACTOR = 0.25;
 
 struct Light {
     vec4 position;
     vec4 color;
 };
 
-layout(location = 0) in vec2 inTextCoord;
+struct CascadeShadow {
+    mat4 projViewMatrix;
+    vec4 splitDistance;
+};
 
+layout(location = 0) in vec2 inTextCoord;
 layout(location = 0) out vec4 outFragColor;
 
 layout(set = 0, binding = 0) uniform sampler2D albedoSampler;
 layout(set = 0, binding = 1) uniform sampler2D normalsSampler;
 layout(set = 0, binding = 2) uniform sampler2D pbrSampler;
 layout(set = 0, binding = 3) uniform sampler2D depthSampler;
+layout(set = 0, binding = 4) uniform sampler2DArray shadowSampler;
 
 layout(set = 1, binding = 0) readonly buffer Lights {
     Light lights[];
@@ -27,8 +39,12 @@ layout(set = 2, binding = 0) uniform SceneUniform {
 
 layout(set = 3, binding = 0) uniform ProjUniform {
     mat4 invProjectionMatrix;
+    mat4 invViewMatrix;
 } projUniform;
 
+layout(set = 4, binding = 0) readonly buffer ShadowUniforms {
+    CascadeShadow cascadesShadows[];
+} shadowsUniforms;
 
 vec3 fresnelSchlick(float cosTheta, vec3 F0)
 {
@@ -120,6 +136,58 @@ float metallic, float roughness) {
     attenuation);
 }
 
+float textureProj(vec4 shadowCoord, vec2 offset, uint cascadeIndex)
+{
+    float shadow = 1.0;
+
+    if (shadowCoord.z > -1.0 && shadowCoord.z < 1.0) {
+        float dist = texture(shadowSampler, vec3(shadowCoord.st + offset, cascadeIndex)).r;
+        if (shadowCoord.w > 0 && dist < shadowCoord.z - BIAS) {
+            shadow = SHADOW_FACTOR;
+        }
+    }
+    return shadow;
+}
+
+float filterPCF(vec4 sc, uint cascadeIndex)
+{
+    ivec2 texDim = textureSize(shadowSampler, 0).xy;
+    float scale = 0.75;
+    float dx = scale * 1.0 / float(texDim.x);
+    float dy = scale * 1.0 / float(texDim.y);
+
+    float shadowFactor = 0.0;
+    int count = 0;
+    int range = 1;
+
+    for (int x = -range; x <= range; x++) {
+        for (int y = -range; y <= range; y++) {
+            shadowFactor += textureProj(sc, vec2(dx*x, dy*y), cascadeIndex);
+            count++;
+        }
+    }
+    return shadowFactor / count;
+}
+
+// transforms from world coordinates space to the NDC space of the directional light
+float calcShadow(vec4 worldPosition, uint cascadeIndex)
+{
+    vec4 shadowMapPosition = shadowsUniforms.cascadesShadows[cascadeIndex].projViewMatrix * worldPosition;
+
+    float shadow = 1.0;
+    vec4 shadowCoords = shadowMapPosition / shadowMapPosition.w; // perspective divition from world space to [-1, 1]
+    shadowCoords.x = shadowCoords.x * 0.5 + 0.5; // from [-1, 1] to [0, 1]
+    shadowCoords.y = (-shadowCoords.y) * 0.5 + 0.5;
+
+    if (USE_PCF == 1) {
+        shadow = filterPCF(shadowCoords, cascadeIndex);
+    } else {
+        shadow = textureProj(shadowCoords, vec2(0, 0), cascadeIndex);
+    }
+
+    return shadow;
+}
+
 void main() {
     vec3 albedo = texture(albedoSampler, inTextCoord).rgb;
     vec3 normal = normalize(2.0 * texture(normalsSampler, inTextCoord).rgb  - 1.0);
@@ -129,27 +197,50 @@ void main() {
     float metallic = pbrSampledValue.b;
 
     // Retrieve position from depth
-    vec4 clip    = vec4(inTextCoord.x * 2.0 - 1.0, inTextCoord.y * -2.0 + 1.0, texture(depthSampler, inTextCoord).x, 1.0);
-    vec4 world_w = projUniform.invProjectionMatrix * clip;
-    vec3 pos     = world_w.xyz / world_w.w;
+    vec4 clip      = vec4(inTextCoord.x * 2.0 - 1.0, inTextCoord.y * -2.0 + 1.0, texture(depthSampler, inTextCoord).x, 1.0);
+    vec4 view_w    = projUniform.invProjectionMatrix * clip;
+    vec3 view_pos  = view_w.xyz / view_w.w;
+    vec4 world_pos = projUniform.invViewMatrix * vec4(view_pos, 1);
+
+    uint cascadeIndex = 0;
+    for (uint i = 0; i < SHADOW_MAP_CASCADE_COUNT - 1; ++i) {
+        if (view_pos.z < shadowsUniforms.cascadesShadows[i].splitDistance.x) {
+            cascadeIndex = i + 1;
+        }
+    }
+
+    float shadowFactor = calcShadow(world_pos, cascadeIndex);
 
     // Calculate lighting
     vec3 lightColor = vec3(0.0);
     vec3 ambientColor = vec3(0.5);
-    for (uint i = 0U; i < sceneUniform.numLights; i++)
-    {
+    for (uint i = 0U; i < sceneUniform.numLights; i++) {
         Light light = lights.lights[i];
-        if (light.position.w == 0)
-        {
-            lightColor += calculateDirectionalLight(light, pos, normal, albedo, metallic, roughness);
-        }
-        else
-        {
-            lightColor += calculatePointLight(light, pos, normal, albedo, metallic, roughness);
+        if (light.position.w == 0) {
+            lightColor += calculateDirectionalLight(light, view_pos, normal, albedo, metallic, roughness);
+        } else {
+            lightColor += calculatePointLight(light, view_pos, normal, albedo, metallic, roughness);
         }
     }
 
     vec3 ambient = sceneUniform.ambientLightColor.rgb * albedo * ao;
 
-    outFragColor = vec4(ambient + lightColor, 1.0);
+    outFragColor = vec4(ambient * shadowFactor + lightColor * shadowFactor, 1.0);
+
+    if (DEBUG_SHADOWS == 1) {
+        switch (cascadeIndex) {
+            case 0:
+            outFragColor.rgb *= vec3(1.0f, 0.25f, 0.25f);
+            break;
+            case 1:
+            outFragColor.rgb *= vec3(0.25f, 1.0f, 0.25f);
+            break;
+            case 2:
+            outFragColor.rgb *= vec3(0.25f, 0.25f, 1.0f);
+            break;
+            default :
+            outFragColor.rgb *= vec3(1.0f, 1.0f, 0.25f);
+            break;
+        }
+    }
 }

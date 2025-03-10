@@ -5,6 +5,7 @@ import com.maorbarak.engine.scene.Scene
 import com.maorbarak.engine.Window
 import com.maorbarak.engine.graph.geometry.GeometryRenderActivity
 import com.maorbarak.engine.graph.lighting.LightingRenderActivity
+import com.maorbarak.engine.graph.shadows.ShadowRenderActivity
 import com.maorbarak.engine.graph.vk.*
 import com.maorbarak.engine.graph.vk.Queue
 import com.maorbarak.engine.scene.ModelData
@@ -25,6 +26,7 @@ class Render(
     private var swapChain: SwapChain
     private val commandPool: CommandPool
     private val geometryRenderActivity: GeometryRenderActivity
+    private val shadowRenderActivity: ShadowRenderActivity
     private val lightingRenderActivity: LightingRenderActivity
     private val pipelineCache: PipelineCache
     private val textureCache: TextureCache
@@ -45,13 +47,19 @@ class Render(
         swapChain = SwapChain(device, surface, window, EngineProperties.requestedImages, EngineProperties.vSync,
             presentQueue, listOf<Queue>(graphicsQueue))
 
+        vulkanModels = mutableListOf()
+        textureCache = TextureCache()
+
         commandPool = CommandPool(device, graphicsQueue.queueFamilyIndex)
         pipelineCache = PipelineCache(device)
         geometryRenderActivity = GeometryRenderActivity(swapChain, commandPool, pipelineCache, scene)
-        lightingRenderActivity = LightingRenderActivity(swapChain, commandPool, pipelineCache,
-            geometryRenderActivity.geometryFrameBuffer.geometryAttachments.attachments, scene)
-        vulkanModels = mutableListOf()
-        textureCache = TextureCache()
+        shadowRenderActivity = ShadowRenderActivity(swapChain, pipelineCache, scene)
+        val attachments = listOf(
+            *geometryRenderActivity.geometryFrameBuffer.geometryAttachments.attachments.toTypedArray(),
+            shadowRenderActivity.depthAttachment
+        )
+        lightingRenderActivity = LightingRenderActivity(swapChain, commandPool, pipelineCache, attachments, scene)
+
     }
 
     fun cleanup() {
@@ -63,6 +71,7 @@ class Render(
         vulkanModels.forEach(VulkanModel::cleanup)
         pipelineCache.cleanup()
         lightingRenderActivity.cleanup()
+        shadowRenderActivity.cleanup()
         geometryRenderActivity.cleanup()
         commandPool.cleanup()
         swapChain.cleanup()
@@ -86,6 +95,7 @@ class Render(
 //        vulkanModels.sortBy { model -> model.vulkanMaterialList.any { it.isTransparent } }
 
         geometryRenderActivity.registerModels(vulkanModels)
+        shadowRenderActivity.registerModels(vulkanModels)
     }
 
     fun render(scene: Scene) {
@@ -102,9 +112,13 @@ class Render(
             swapChain.acquireNextImage()
         }
 
-        geometryRenderActivity.recordCommandBuffer(vulkanModels)
+        val commandBuffer = geometryRenderActivity.beginRecording()
+        geometryRenderActivity.recordCommandBuffer(commandBuffer, vulkanModels)
+        shadowRenderActivity.recordCommandBuffer(commandBuffer, vulkanModels)
+        geometryRenderActivity.endRecording(commandBuffer)
         geometryRenderActivity.submit(graphicsQueue)
-        lightingRenderActivity.prepareCommandBuffer()
+
+        lightingRenderActivity.prepareCommandBuffer(shadowRenderActivity.cascadeShadows)
         lightingRenderActivity.submit(graphicsQueue)
 
         if (swapChain.presentImage(presentQueue, imageIndex)) {
@@ -121,6 +135,11 @@ class Render(
         swapChain = SwapChain(device, surface, window, EngineProperties.requestedImages, EngineProperties.vSync,
             presentQueue, listOf<Queue>(graphicsQueue))
         geometryRenderActivity.resize(swapChain)
-        lightingRenderActivity.resize(swapChain, geometryRenderActivity.geometryFrameBuffer.geometryAttachments.attachments)
+        shadowRenderActivity.resize(swapChain)
+        val attachments = listOf(
+            *geometryRenderActivity.geometryFrameBuffer.geometryAttachments.attachments.toTypedArray(),
+            shadowRenderActivity.depthAttachment
+        )
+        lightingRenderActivity.resize(swapChain, attachments)
     }
 }

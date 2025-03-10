@@ -8,6 +8,10 @@ class Scene (
     val window: Window
 ) {
 
+    var directionalLight: Light? = null
+        private set
+    var lightChanged: Boolean = false
+
     val entitiesMap: HashMap<String, MutableList<Entity>>
     val projection: Projection
     val camera: Camera
@@ -43,5 +47,10 @@ class Scene (
         }
 
         this.lights = lights
+        directionalLight = lights.firstOrNull { light ->
+            light.position.w.toInt() == 0
+        }
+
+        lightChanged = true
     }
 }

@@ -32,6 +32,10 @@ class Pipeline(
                     .stage(shaderModules[i].shaderStage)
                     .module(shaderModules[i].handle)
                     .pName(main)
+
+                shaderModules[i].specInfo?.let { specInfo ->
+                    shaderStages[i].pSpecializationInfo(specInfo)
+                }
             }
 
             val vkPipelineInputAssemblyStateCreateInfo = VkPipelineInputAssemblyStateCreateInfo.calloc(stack)

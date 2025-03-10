@@ -13,6 +13,8 @@ class Camera {
     val up = Vector3f()
     val viewMatrix = Matrix4f()
 
+    var hasMoved: Boolean = false
+
     fun addRotation(x: Float, y: Float) {
         rotation.add(x, y)
         recalculate()
@@ -55,6 +57,7 @@ class Camera {
     }
 
     private fun recalculate() {
+        hasMoved = true
         viewMatrix.identity()
             .rotateX(rotation.x)
             .rotateY(rotation.y)

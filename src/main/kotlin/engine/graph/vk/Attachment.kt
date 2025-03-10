@@ -7,7 +7,9 @@ class Attachment(
     width: Int,
     height: Int,
     format: Int,
-    usage: Int
+    usage: Int,
+    arrayLayers: Int = 1,
+    viewType: Int = VK_IMAGE_VIEW_TYPE_2D
 ) {
 
     val image: Image
@@ -21,7 +23,8 @@ class Attachment(
                 height,
                 width,
                 usage = usage or VK_IMAGE_USAGE_SAMPLED_BIT,
-                format = format
+                format = format,
+                arrayLayers = arrayLayers
             )
         )
 
@@ -45,7 +48,9 @@ class Attachment(
             image.vkImage,
             ImageView.ImageViewData(
                 aspectMask,
-                format = image.format
+                format = image.format,
+                layerCount = arrayLayers,
+                viewType = viewType
             )
         )
     }
